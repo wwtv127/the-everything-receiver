@@ -1,3 +1,3 @@
-# PenguinTube And Other Stuff
-This Is Storage For PenguinTube's Videos And Data 
-But This Can Also Be Used To Store Videos And Data For Other Projects As Well
+# The EveryThing Receiver
+This Is Storage For Videos And Data For Any Projects That Wwtv Is Creating
+
