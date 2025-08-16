@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Platformer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #2c3e50;
+            font-family: 'Inter', sans-serif;
+            color: #ecf0f1;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none; /* Prevent text selection on mobile */
+        }
+
+        .game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        canvas {
+            background-color: #34495e;
+            display: block;
+            border-radius: 12px;
+        }
+
+        .message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(44, 62, 80, 0.9);
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.2em;
+            margin: 5px 0;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .on-screen-controls {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            z-index: 5;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        
+        @media (min-width: 768px) {
+            .on-screen-controls {
+                display: none; /* Hide on large screens */
+            }
+        }
+
+        .control-button {
+            width: 60px;
+            height: 60px;
+            background-color: #3498db;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2em;
+            color: #ecf0f1;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s ease;
+            -webkit-tap-highlight-color: transparent; /* Remove blue highlight on tap */
+        }
+        
+        .control-button:active {
+            transform: scale(0.95);
+        }
+
+        .start-button {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #ecf0f1;
+            background-color: #3498db;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .start-button:hover {
+            background-color: #2980b9;
+        }
+
+        .start-button:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="messageBox" class="message-box">
+            <h1>Platformer!</h1>
+            <p>Use the controls to move and jump.</p>
+            <p>Collect all the green gems!</p>
+            <button id="startButton" class="start-button">Tap to Start</button>
+        </div>
+        <div class="on-screen-controls">
+            <button id="leftButton" class="control-button">&larr;</button>
+            <button id="jumpButton" class="control-button">&#x2191;</button>
+            <button id="rightButton" class="control-button">&rarr;</button>
+        </div>
+    </div>
+    
+    <script>
+        // Use Tone.js for simple sound effects
+        const synth = new Tone.Synth().toDestination();
+        const gemSynth = new Tone.Synth({
+            oscillator: { type: "square" },
+            envelope: {
+                attack: 0.005,
+                decay: 0.1,
+                sustain: 0.05,
+                release: 0.1
+            }
+        }).toDestination();
+
+        // New synths for win and game over sounds
+        const winSynth = new Tone.Synth({
+            oscillator: { type: "sine" },
+            envelope: {
+                attack: 0.05,
+                decay: 0.5,
+                sustain: 0.2,
+                release: 0.8
+            }
+        }).toDestination();
+        
+        const gameOverSynth = new Tone.Synth({
+            oscillator: { type: "square" },
+            envelope: {
+                attack: 0.01,
+                decay: 0.2,
+                sustain: 0.1,
+                release: 0.3
+            }
+        }).toDestination();
+        
+        // Setup canvas and context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('messageBox');
+        const startButton = document.getElementById('startButton');
+
+        // Set canvas dimensions responsively
+        let canvasWidth = Math.min(window.innerWidth * 0.9, 800);
+        let canvasHeight = Math.min(window.innerHeight * 0.7, 600);
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        
+        window.addEventListener('resize', () => {
+            canvasWidth = Math.min(window.innerWidth * 0.9, 800);
+            canvasHeight = Math.min(window.innerHeight * 0.7, 600);
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            draw();
+        });
+
+        // Game state variables
+        let isGameRunning = false;
+        let score = 0;
+        let player = {
+            x: 50,
+            y: canvasHeight - 70,
+            width: 30,
+            height: 30,
+            velocityY: 0,
+            velocityX: 0,
+            onGround: false
+        };
+
+        const gravity = 0.5;
+        const jumpStrength = -12;
+        const horizontalSpeed = 5;
+
+        // Level data: platforms and gems
+        let platforms = [];
+        let gems = [];
+        
+        function setupLevel() {
+            // Reset game state
+            score = 0;
+            player.x = 50;
+            player.y = canvasHeight - 70;
+            player.velocityY = 0;
+            player.onGround = false;
+
+            // Define platforms
+            platforms = [
+                { x: 0, y: canvasHeight - 40, width: canvasWidth, height: 40 }, // Ground platform
+                { x: 150, y: canvasHeight - 150, width: 200, height: 20 },
+                { x: 450, y: canvasHeight - 250, width: 150, height: 20 },
+                { x: 200, y: canvasHeight - 350, width: 100, height: 20 },
+                { x: 50, y: canvasHeight - 450, width: 100, height: 20 }
+            ];
+
+            // Define gems. We will use only two gems to match the game's design.
+            gems = [
+                { x: 250, y: canvasHeight - 180, width: 20, height: 20, collected: false },
+                { x: 500, y: canvasHeight - 280, width: 20, height: 20, collected: false }
+            ];
+        }
+
+        // Input handling for keyboard and on-screen controls
+        let keys = {};
+        const onScreenControls = { left: false, right: false, jump: false };
+
+        // Keyboard events
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (!isGameRunning && e.key === 'ArrowUp') {
+                startGame();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // On-screen control events
+        const leftButton = document.getElementById('leftButton');
+        const rightButton = document.getElementById('rightButton');
+        const jumpButton = document.getElementById('jumpButton');
+
+        leftButton.addEventListener('touchstart', (e) => { e.preventDefault(); onScreenControls.left = true; });
+        leftButton.addEventListener('touchend', (e) => { e.preventDefault(); onScreenControls.left = false; });
+        leftButton.addEventListener('mousedown', () => { onScreenControls.left = true; });
+        leftButton.addEventListener('mouseup', () => { onScreenControls.left = false; });
+        leftButton.addEventListener('mouseleave', () => { onScreenControls.left = false; });
+
+        rightButton.addEventListener('touchstart', (e) => { e.preventDefault(); onScreenControls.right = true; });
+        rightButton.addEventListener('touchend', (e) => { e.preventDefault(); onScreenControls.right = false; });
+        rightButton.addEventListener('mousedown', () => { onScreenControls.right = true; });
+        rightButton.addEventListener('mouseup', () => { onScreenControls.right = false; });
+        rightButton.addEventListener('mouseleave', () => { onScreenControls.right = false; });
+
+        jumpButton.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            onScreenControls.jump = true; 
+        });
+        jumpButton.addEventListener('touchend', (e) => { e.preventDefault(); onScreenControls.jump = false; });
+        jumpButton.addEventListener('mousedown', () => { 
+            onScreenControls.jump = true; 
+        });
+        jumpButton.addEventListener('mouseup', () => { onScreenControls.jump = false; });
+        jumpButton.addEventListener('mouseleave', () => { onScreenControls.jump = false; });
+        
+        startButton.addEventListener('click', startGame);
+        startButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startGame();
+        });
+
+
+        // Function to play a simple win sound
+        function playWinSound() {
+            winSynth.triggerAttackRelease("C5", "8n");
+            winSynth.triggerAttackRelease("E5", "8n", "+0.2");
+            winSynth.triggerAttackRelease("G5", "8n", "+0.4");
+            winSynth.triggerAttackRelease("C6", "4n", "+0.6");
+        }
+
+        // Function to play a simple game over sound
+        function playGameOverSound() {
+            gameOverSynth.triggerAttackRelease("C4", "8n");
+            gameOverSynth.triggerAttackRelease("A3", "8n", "+0.2");
+            gameOverSynth.triggerAttackRelease("F3", "4n", "+0.4");
+        }
+
+        function startGame() {
+            if (!isGameRunning) {
+                isGameRunning = true;
+                messageBox.classList.add('hidden');
+                setupLevel();
+                gameLoop();
+            }
+        }
+
+        function showMessage(title, subtitle) {
+            isGameRunning = false;
+            messageBox.querySelector('h1').textContent = title;
+            messageBox.querySelector('p:nth-of-type(1)').textContent = subtitle;
+            startButton.textContent = "Play Again";
+            messageBox.classList.remove('hidden');
+        }
+
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            update();
+            draw();
+            
+            // This is the new win/lose check logic.
+            // Check for a win first, then for a loss.
+            if (score === gems.length) {
+                playWinSound();
+                showMessage("You Win!", "You collected all the gems!");
+                // Return to prevent the game loop from continuing.
+                return; 
+            }
+            
+            if (player.y > canvasHeight) {
+                playGameOverSound();
+                showMessage("Game Over", "You fell!");
+                // Return to prevent the game loop from continuing.
+                return;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update() {
+            // Horizontal movement using both keyboard and on-screen controls
+            player.velocityX = 0;
+            if (keys['ArrowLeft'] || onScreenControls.left) {
+                player.velocityX = -horizontalSpeed;
+            }
+            if (keys['ArrowRight'] || onScreenControls.right) {
+                player.velocityX = horizontalSpeed;
+            }
+            player.x += player.velocityX;
+
+            // Apply gravity
+            player.velocityY += gravity;
+            player.y += player.velocityY;
+
+            // Check for collision with platforms
+            player.onGround = false;
+            for (let i = 0; i < platforms.length; i++) {
+                const platform = platforms[i];
+                if (
+                    player.x < platform.x + platform.width &&
+                    player.x + player.width > platform.x &&
+                    player.y + player.height <= platform.y + player.velocityY && // Top edge check
+                    player.y + player.height + player.velocityY >= platform.y &&
+                    player.velocityY >= 0
+                ) {
+                    player.y = platform.y - player.height;
+                    player.velocityY = 0;
+                    player.onGround = true;
+                }
+            }
+
+            // Jumping using both keyboard and on-screen controls
+            if ((keys['ArrowUp'] || onScreenControls.jump) && player.onGround) {
+                player.velocityY = jumpStrength;
+                player.onGround = false;
+                // Play a jumping sound
+                synth.triggerAttackRelease("C4", "8n");
+            }
+            
+            // Collect gems
+            for (let i = 0; i < gems.length; i++) {
+                const gem = gems[i];
+                if (!gem.collected && 
+                    player.x < gem.x + gem.width &&
+                    player.x + player.width > gem.x &&
+                    player.y < gem.y + gem.height &&
+                    player.y + player.height > gem.y) {
+                    
+                    gem.collected = true;
+                    score++;
+                    // Play a gem collection sound
+                    gemSynth.triggerAttackRelease("C5", "16n");
+                    gemSynth.triggerAttackRelease("E5", "16n", "+0.05");
+                    gemSynth.triggerAttackRelease("G5", "16n", "+0.1");
+                }
+            }
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // Draw player
+            ctx.fillStyle = '#f1c40f'; // Player color: Yellow
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw platforms
+            ctx.fillStyle = '#ecf0f1'; // Platform color: Light grey
+            platforms.forEach(platform => {
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            });
+
+            // Draw gems
+            ctx.fillStyle = '#2ecc71'; // Gem color: Green
+            gems.forEach(gem => {
+                if (!gem.collected) {
+                    ctx.fillRect(gem.x, gem.y, gem.width, gem.height);
+                }
+            });
+            
+            // Draw score
+            ctx.fillStyle = '#ecf0f1';
+            ctx.font = '24px "Inter"';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Gems: ${score}`, 10, 30);
+        }
+        
+        // Initial setup
+        setupLevel();
+        draw();
+    </script>
+</body>
+</html>
