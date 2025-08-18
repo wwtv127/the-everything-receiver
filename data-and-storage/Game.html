@@ -54,7 +54,7 @@
             width: auto;
             box-sizing: border-box;
         }
-
+        
         #patty-logo {
             /* Updated responsive styles for smaller screens */
             width: 30%; /* Made it significantly smaller */
@@ -95,14 +95,6 @@
             padding: 0 20px;
             box-sizing: border-box;
         }
-        
-        /* The media query below has been removed to ensure the controls are always visible.
-        @media (min-width: 768px) {
-            .on-screen-controls {
-                display: none;
-            }
-        }
-        */
 
         .control-button {
             width: 60px;
@@ -144,6 +136,26 @@
         .start-button:active {
             transform: scale(0.98);
         }
+
+        #videoPlayerContainer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            display: none; /* Hidden by default */
+            background: #000;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8);
+        }
+
+        #victoryVideo {
+            display: block;
+            max-width: 90vw;
+            max-height: 80vh;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -151,9 +163,15 @@
         <canvas id="gameCanvas"></canvas>
         <div id="messageBox" class="message-box">
             <img id="patty-logo" src="https://files.catbox.moe/m1uq1k.png" alt="Krabby Patty Logo">
-            <h1>Loading...</h1>
-            <p>Please wait...</p>
+            <h1 id="messageTitle">Loading...</h1>
+            <p id="messageSubtitle">Please wait...</p>
             <button id="startButton" class="start-button loading-button">Tap to Start</button>
+        </div>
+        <div id="videoPlayerContainer">
+            <video id="victoryVideo" playsinline preload="auto">
+                <source src="https://files.catbox.moe/k8uoow.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
         </div>
         <div class="on-screen-controls">
             <button id="leftButton" class="control-button">&larr;</button>
@@ -213,54 +231,70 @@
         const messageBox = document.getElementById('messageBox');
         const startButton = document.getElementById('startButton');
         const pattyLogo = document.getElementById('patty-logo');
+        const videoContainer = document.getElementById('videoPlayerContainer');
+        const videoElement = document.getElementById('victoryVideo');
         
-        // Load the character image
-        const playerImage = new Image();
-        playerImage.crossOrigin = "anonymous"; // Fix for cross-origin issues
-        playerImage.src = 'https://files.catbox.moe/bxae5r.jpeg';
-        let isPlayerImageLoaded = false;
-        
-        // Load the Krabby Patty image (for drawing, not the logo)
-        const pattyImage = new Image();
-        pattyImage.crossOrigin = "anonymous"; // Fix for cross-origin issues
-        pattyImage.src = 'https://files.catbox.moe/m1uq1k.png';
-        let isPattyImageLoaded = false;
-
-        // Counter for loaded assets
-        let assetsLoadedCount = 0;
-        const totalAssets = 2; // playerImage and pattyImage
-
-        function checkAssetsLoaded() {
-            assetsLoadedCount++;
-            if (assetsLoadedCount === totalAssets) {
-                // All assets are loaded, show the plot screen
-                showMessage("Oh no!", "The Krusty Krab has ran out of Krabby Patties. You need to help SpongeBob by collecting them throughout these levels!", "Continue");
-                startButton.classList.remove('loading-button');
+        // Define images and their loaded state
+        const assets = {
+            player: {
+                url: 'https://files.catbox.moe/bxae5r.jpeg',
+                image: new Image(),
+                loaded: false
+            },
+            patty: {
+                url: 'https://files.catbox.moe/m1uq1k.png',
+                image: new Image(),
+                loaded: false
+            },
+            krustyKrab: {
+                url: 'https://files.catbox.moe/ihxkyk.png',
+                image: new Image(),
+                loaded: false
             }
+        };
+
+        const totalAssets = Object.keys(assets).length;
+        let assetsLoadedCount = 0;
+        
+        function loadAssets() {
+            // New loading function with a progress bar
+            const titleElement = document.getElementById('messageTitle');
+            const subtitleElement = document.getElementById('messageSubtitle');
+
+            const promises = Object.keys(assets).map(key => {
+                return new Promise((resolve) => {
+                    const asset = assets[key];
+                    asset.image.crossOrigin = "anonymous";
+                    asset.image.onload = () => {
+                        asset.loaded = true;
+                        assetsLoadedCount++;
+                        updateLoadingMessage(subtitleElement);
+                        resolve();
+                    };
+                    asset.image.onerror = () => {
+                        console.error(`Failed to load asset from ${asset.url}. Using a fallback.`);
+                        assetsLoadedCount++;
+                        updateLoadingMessage(subtitleElement);
+                        resolve(); // Resolve anyway to allow the game to continue
+                    };
+                    asset.image.src = asset.url;
+                });
+            });
+
+            Promise.all(promises).then(() => {
+                // All assets are loaded (or failed), show the plot screen
+                titleElement.textContent = "Oh no!";
+                subtitleElement.textContent = "The Krusty Krab has ran out of Krabby Patties. You need to help SpongeBob by collecting them throughout these levels!";
+                startButton.textContent = "Continue";
+                startButton.classList.remove('loading-button');
+            });
         }
         
-        playerImage.onload = () => {
-            isPlayerImageLoaded = true;
-            checkAssetsLoaded();
-        };
-
-        playerImage.onerror = () => {
-            console.error("Failed to load player image from URL. The character will be a yellow square.");
-            isPlayerImageLoaded = false;
-            checkAssetsLoaded();
-        };
-
-        pattyImage.onload = () => {
-            isPattyImageLoaded = true;
-            checkAssetsLoaded();
-        };
-
-        pattyImage.onerror = () => {
-            console.error("Failed to load Krabby Patty image from URL. The patties will be brown squares.");
-            isPattyImageLoaded = false;
-            checkAssetsLoaded();
-        };
-
+        function updateLoadingMessage(subtitleElement) {
+            const percentage = Math.round((assetsLoadedCount / totalAssets) * 100);
+            subtitleElement.textContent = `Loading... ${percentage}%`;
+        }
+        
         // Set canvas dimensions responsively
         let canvasWidth;
         let canvasHeight;
@@ -284,25 +318,18 @@
         let isGameRunning = false;
         let score = 0;
         let currentLevelIndex = 0;
-        let player = {
-            x: 50,
-            y: canvasHeight - 100,
-            width: 30, // Adjusted to be smaller
-            height: 40, // Adjusted to be smaller
-            velocityY: 0,
-            velocityX: 0,
-            onGround: false
-        };
-
+        let player = {};
+        
         const gravity = 0.5;
         const jumpStrength = -12;
         const horizontalSpeed = 5;
 
-        // Level data: platforms and Krabby Patties
+        // Level data: platforms, patties, lava, and new krustyKrab goal
         let levels = [];
         let platforms = [];
         let patties = [];
         let lava = [];
+        let krustyKrab = null;
         
         function defineLevels() {
             levels = [
@@ -319,7 +346,8 @@
                         { x: canvasWidth * 0.65, y: canvasHeight * 0.5, width: 30, height: 30, collected: false },
                         { x: canvasWidth * 0.3, y: canvasHeight * 0.3, width: 30, height: 30, collected: false },
                     ],
-                    lava: []
+                    lava: [],
+                    krustyKrab: null
                 },
                 // Level 2: More Krabby Patties
                 {
@@ -336,7 +364,8 @@
                         { x: canvasWidth * 0.5, y: canvasHeight * 0.15, width: 30, height: 30, collected: false },
                         { x: canvasWidth * 0.2, y: canvasHeight * 0.75, width: 30, height: 30, collected: false },
                     ],
-                    lava: []
+                    lava: [],
+                    krustyKrab: null
                 },
                 // Level 3: Harder Jumps
                 {
@@ -355,7 +384,8 @@
                         { x: canvasWidth * 0.8, y: canvasHeight * 0.2, width: 30, height: 30, collected: false },
                         { x: canvasWidth * 0.3, y: canvasHeight * 0.15, width: 30, height: 30, collected: false },
                     ],
-                    lava: []
+                    lava: [],
+                    krustyKrab: null
                 },
                 // Level 4: Lava
                 {
@@ -373,18 +403,19 @@
                     lava: [
                         { x: canvasWidth * 0.3, y: canvasHeight - 40, width: canvasWidth * 0.2, height: 20 },
                         { x: canvasWidth * 0.6, y: canvasHeight - 40, width: canvasWidth * 0.2, height: 20 },
-                    ]
+                    ],
+                    krustyKrab: null
                 },
-                // Level 5: Victory Stage
+                // Level 5: Victory Stage with Krusty Krab
                 {
                     platforms: [
                         { x: 0, y: canvasHeight - 40, width: canvasWidth, height: 40 },
                         { x: canvasWidth * 0.3, y: canvasHeight * 0.6, width: canvasWidth * 0.4, height: 20 },
                     ],
-                    patties: [
-                        { x: canvasWidth * 0.45, y: canvasHeight * 0.55, width: 30, height: 30, collected: false },
-                    ],
-                    lava: []
+                    patties: [],
+                    lava: [],
+                    // Changed width to 130 as requested
+                    krustyKrab: { x: canvasWidth * 0.4, y: canvasHeight * 0.6 - 120, width: 130, height: 120 }
                 }
             ];
         }
@@ -392,15 +423,21 @@
         function setupLevel() {
             // Reset game state
             score = 0;
-            player.x = 50;
-            player.y = canvasHeight - 100;
-            player.velocityY = 0;
-            player.onGround = false;
+            player = {
+                x: 50,
+                y: canvasHeight - 100,
+                width: 30,
+                height: 40,
+                velocityY: 0,
+                velocityX: 0,
+                onGround: false
+            };
 
             // Load a deep copy of platforms, patties, and lava for the current level
             platforms = JSON.parse(JSON.stringify(levels[currentLevelIndex].platforms));
             patties = JSON.parse(JSON.stringify(levels[currentLevelIndex].patties));
             lava = JSON.parse(JSON.stringify(levels[currentLevelIndex].lava));
+            krustyKrab = levels[currentLevelIndex].krustyKrab ? JSON.parse(JSON.stringify(levels[currentLevelIndex].krustyKrab)) : null;
         }
 
         // Input handling for keyboard and on-screen controls
@@ -448,10 +485,8 @@
         jumpButton.addEventListener('mouseleave', () => { onScreenControls.jump = false; });
         
         startButton.addEventListener('click', () => {
-            // Play a sound for the button click
             buttonSynth.triggerAttackRelease("G4", "8n");
             
-            // Handle different button states
             if (startButton.textContent === "Continue") {
                 startGame();
             } else if (startButton.textContent === "Next Level") {
@@ -464,10 +499,8 @@
         });
         startButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            // Play a sound for the button click
             buttonSynth.triggerAttackRelease("G4", "8n");
             
-            // Handle different button states
             if (startButton.textContent === "Continue") {
                 startGame();
             } else if (startButton.textContent === "Next Level") {
@@ -477,6 +510,13 @@
                 currentLevelIndex = 0;
                 startGame();
             }
+        });
+
+        // Event listener for video ending
+        videoElement.addEventListener('ended', () => {
+            videoContainer.style.display = 'none';
+            playWinSound();
+            showMessage("You Win!", "You've completed all levels!", "Play Again");
         });
 
         // Function to play the new win sound ("Who lives in a pineapple under the sea?")
@@ -510,8 +550,8 @@
 
         function showMessage(title, subtitle, buttonText) {
             isGameRunning = false;
-            messageBox.querySelector('h1').textContent = title;
-            messageBox.querySelector('p:nth-of-type(1)').textContent = subtitle;
+            document.getElementById('messageTitle').textContent = title;
+            document.getElementById('messageSubtitle').textContent = subtitle;
             if (buttonText) {
                 startButton.textContent = buttonText;
                 startButton.classList.remove('loading-button');
@@ -519,7 +559,6 @@
                 startButton.classList.add('loading-button');
             }
 
-            // Updated logic: Only show the logo for the specific "Oh no!" plot screen
             if (title === "Oh no!") {
                 pattyLogo.style.display = 'block';
             } else {
@@ -535,15 +574,13 @@
             update();
             draw();
             
-            // Check for level completion
-            if (score === patties.length) {
-                if (currentLevelIndex < levels.length - 1) {
+            // Check for level completion based on the current level
+            if (currentLevelIndex < levels.length - 1) {
+                // For regular levels, check if all patties are collected
+                if (score === patties.length) {
                     showMessage("Level Complete!", "You collected all the Krabby Patties!", "Next Level");
-                } else {
-                    playWinSound();
-                    showMessage("You Win!", "You've completed all levels!", "Play Again");
+                    return;
                 }
-                return;
             }
             
             // Check for falling off the screen
@@ -613,20 +650,33 @@
                 synth.triggerAttackRelease("C4", "8n");
             }
             
-            // Collect Krabby Patties
-            for (let i = 0; i < patties.length; i++) {
-                const patty = patties[i];
-                if (!patty.collected && 
-                    player.x < patty.x + patty.width &&
-                    player.x + player.width > patty.x &&
-                    player.y < patty.y + patty.height &&
-                    player.y + player.height > patty.y) {
+            // Collect Krabby Patties if on a regular level
+            if (currentLevelIndex < levels.length - 1) {
+                for (let i = 0; i < patties.length; i++) {
+                    const patty = patties[i];
+                    if (!patty.collected && 
+                        player.x < patty.x + patty.width &&
+                        player.x + player.width > patty.x &&
+                        player.y < patty.y + patty.height &&
+                        player.y + player.height > patty.y) {
+                        
+                        patty.collected = true;
+                        score++;
+                        // Play a Krabby Patty collection sound
+                        pattySynth.triggerAttackRelease("C3", "16n");
+                        pattySynth.triggerAttackRelease("F3", "16n", "+0.05");
+                    }
+                }
+            } else { // Check for Krusty Krab collision on the final level
+                if (krustyKrab && 
+                    player.x < krustyKrab.x + krustyKrab.width &&
+                    player.x + player.width > krustyKrab.x &&
+                    player.y < krustyKrab.y + krustyKrab.height &&
+                    player.y + player.height > krustyKrab.y) {
                     
-                    patty.collected = true;
-                    score++;
-                    // Play a Krabby Patty collection sound
-                    pattySynth.triggerAttackRelease("C3", "16n");
-                    pattySynth.triggerAttackRelease("F3", "16n", "+0.05");
+                    isGameRunning = false;
+                    videoContainer.style.display = 'block';
+                    videoElement.play();
                 }
             }
         }
@@ -636,8 +686,8 @@
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
             // Draw the player image if it has loaded
-            if (isPlayerImageLoaded) {
-                ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+            if (assets.player.loaded) {
+                ctx.drawImage(assets.player.image, player.x, player.y, player.width, player.height);
             } else {
                 // Fallback to a simple yellow square if the image failed to load
                 ctx.fillStyle = '#f1c40f';
@@ -659,8 +709,8 @@
             // Draw Krabby Patties
             patties.forEach(patty => {
                 if (!patty.collected) {
-                    if (isPattyImageLoaded) {
-                        ctx.drawImage(pattyImage, patty.x, patty.y, patty.width, patty.height);
+                    if (assets.patty.loaded) {
+                        ctx.drawImage(assets.patty.image, patty.x, patty.y, patty.width, patty.height);
                     } else {
                         // Fallback to a brown square if the Krabby Patty image failed to load
                         ctx.fillStyle = '#8B4513';
@@ -668,6 +718,16 @@
                     }
                 }
             });
+
+            // Draw Krusty Krab on the final level
+            if (krustyKrab) {
+                if (assets.krustyKrab.loaded) {
+                    ctx.drawImage(assets.krustyKrab.image, krustyKrab.x, krustyKrab.y, krustyKrab.width, krustyKrab.height);
+                } else {
+                    ctx.fillStyle = '#2ecc71'; // Fallback to a green square
+                    ctx.fillRect(krustyKrab.x, krustyKrab.y, krustyKrab.width, krustyKrab.height);
+                }
+            }
             
             // Draw score and level
             ctx.fillStyle = '#ecf0f1';
@@ -679,9 +739,12 @@
         }
         
         // Initial setup
-        setCanvasSize();
-        defineLevels();
-        showMessage("Loading...", "Please wait...", "");
+        window.onload = function() {
+            setCanvasSize();
+            defineLevels();
+            setupLevel();
+            loadAssets();
+        }
     </script>
 </body>
 </html>
