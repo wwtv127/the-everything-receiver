@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Song Player</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tone.js for music generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Font Awesome for loading icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 0.5s ease-in-out;
+            position: relative;
+        }
+
+        /* Custom styles for the player buttons and icons */
+        .play-icon {
+            transform: translateX(1px); /* Slight adjustment for visual centering */
+        }
+
+        /* SpongeBob Theme Styles */
+        .spongebob-theme {
+            background-image: url('https://files.catbox.moe/0zl1pl.jpeg');
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        .spongebob-theme button,
+        .spongebob-theme select,
+        .spongebob-theme input {
+            background: rgba(144, 202, 249, 0.4); /* Light blue, translucent background */
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            color: #2F6992;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+            animation: float 4s ease-in-out infinite;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .spongebob-theme button:hover,
+        .spongebob-theme select:hover {
+            animation-play-state: paused;
+            transform: scale(1.05);
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(1deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        /* Bubble viewport to prevent seeing bubbles pop in */
+        .bubble-viewport {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Bubble styles for dynamic generation */
+        .bubble-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .bubble {
+            position: absolute;
+            bottom: -50px;
+            background-image: url('https://files.catbox.moe/7j0vx0.webp');
+            background-size: cover;
+            background-repeat: no-repeat;
+            animation: float-up linear infinite;
+        }
+
+        @keyframes float-up {
+            0% {
+                transform: translate(0, 0);
+                opacity: 0.8;
+            }
+            100% {
+                transform: translate(var(--x-offset), -100vh);
+                opacity: 0;
+            }
+        }
+
+        /* Bubble effect on hover for SpongeBob theme */
+        .bubble-btn:hover::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            z-index: -1;
+            transform: scale(0);
+            animation: bubblePop 0.5s forwards;
+        }
+
+        @keyframes bubblePop {
+            to {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-300 to-indigo-500 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Styles Button -->
+    <div class="absolute top-4 right-4 z-10">
+        <button id="styles-btn" class="p-2 px-4 rounded-full bg-white text-gray-800 shadow-md hover:bg-gray-200 transition-all duration-300">
+            Styles
+        </button>
+    </div>
+
+    <!-- Styles Panel -->
+    <div id="styles-panel" class="absolute top-16 right-4 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-lg hidden z-10">
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Choose a Style</h3>
+        <div class="flex flex-col gap-2">
+            <button id="default-style-btn" class="p-2 rounded-xl bg-blue-500 text-white font-bold hover:bg-blue-600 transition-colors">Default</button>
+            <button id="spongebob-style-btn" class="p-2 rounded-xl bg-yellow-400 text-blue-800 font-bold hover:bg-yellow-500 transition-colors">SpongeBob</button>
+        </div>
+    </div>
+    
+    <!-- Bubble Viewport -->
+    <div class="bubble-viewport">
+        <!-- Bubble Container -->
+        <div id="bubble-container" class="bubble-container"></div>
+    </div>
+
+    <!-- Player Container -->
+    <div id="main-container" class="bg-white/80 backdrop-blur-sm p-8 rounded-3xl shadow-2xl space-y-6 max-w-sm w-full z-10 relative">
+
+        <!-- Header -->
+        <div class="flex flex-col items-center">
+            <!-- Fun Icon/Image -->
+            <img src="https://placehold.co/100x100/A0C4FF/003366?text=🎵" alt="Music Icon" class="rounded-full mb-4 shadow-md">
+            <h1 class="text-4xl font-extrabold text-center text-blue-800">Theme Tunes!</h1>
+            <p class="text-gray-600 mt-2 text-center">Select and play a theme song!</p>
+        </div>
+
+        <!-- Audio Element for pre-loaded songs -->
+        <audio id="theme-audio" src="https://files.catbox.moe/prhem0.mp3"></audio>
+
+        <!-- Pre-loaded Song Player Controls -->
+        <div class="flex items-center justify-between gap-4">
+            <!-- Song Selection Dropdown -->
+            <select id="song-select" class="flex-1 bg-white p-3 rounded-xl border-2 border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-700 font-medium cursor-pointer">
+                <option value="https://files.catbox.moe/prhem0.mp3" selected>Bluey Theme Song</option>
+                <option value="https://files.catbox.moe/v0rj49.mp3">Animaniacs Theme Song</option>
+                <option value="https://files.catbox.moe/texsag.mp3">SpongeBob Theme Song</option>
+            </select>
+
+            <!-- Play/Pause Button for pre-loaded songs -->
+            <button id="play-pause-btn" class="p-3 rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 active:scale-95">
+                <svg id="play-icon" class="w-6 h-6 play-icon" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                </svg>
+                <svg id="pause-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Divider -->
+        <div class="border-t-2 border-blue-200 my-6"></div>
+
+        <!-- Gemini API Section -->
+        <div class="relative">
+            <div class="space-y-4">
+                <h2 class="text-2xl font-bold text-center text-blue-700">Generate a new song!</h2>
+                <div class="flex flex-col gap-2">
+                    <input type="text" id="prompt-input" placeholder="e.g., A theme song for a sneaky cat" class="w-full p-3 rounded-xl border-2 border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-700 placeholder-blue-300">
+                    <button id="generate-btn" class="w-full p-3 rounded-xl bg-purple-500 text-white font-bold shadow-lg hover:bg-purple-600 transition-all duration-300 transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
+                        <span id="generate-text">Generate Song</span>
+                        <i id="loading-spinner" class="fas fa-spinner fa-spin hidden"></i>
+                    </button>
+                </div>
+                <div id="status-message" class="text-center text-gray-500 italic min-h-6"></div>
+            </div>
+
+            <!-- Divider -->
+            <div class="border-t-2 border-blue-200 my-6"></div>
+
+            <!-- AI Generated Song Player -->
+            <div id="ai-player-section" class="space-y-4 hidden">
+                <h2 class="text-2xl font-bold text-center text-blue-700">AI Theme Song Player</h2>
+                <div class="flex items-center justify-between gap-4">
+                    <span id="ai-song-title" class="flex-1 text-blue-700 font-bold text-center"></span>
+                    <button id="ai-play-pause-btn" class="p-3 rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 active:scale-95">
+                        <svg id="ai-play-icon" class="w-6 h-6 play-icon" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                        </svg>
+                        <svg id="ai-pause-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Work in Progress Banner -->
+            <div class="absolute inset-0 flex items-center justify-center bg-purple-500 bg-opacity-80 backdrop-blur-sm rounded-3xl z-20">
+                <span class="text-white text-3xl font-bold text-center">Work In Progress</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to our HTML elements
+        const body = document.body;
+        const mainContainer = document.getElementById('main-container');
+        const audio = document.getElementById('theme-audio');
+        const songSelect = document.getElementById('song-select');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+
+        // New elements for the generative feature
+        const promptInput = document.getElementById('prompt-input');
+        const generateBtn = document.getElementById('generate-btn');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const generateText = document.getElementById('generate-text');
+        const statusMessage = document.getElementById('status-message');
+        const aiPlayerSection = document.getElementById('ai-player-section');
+        const aiSongTitle = document.getElementById('ai-song-title');
+        const aiPlayPauseBtn = document.getElementById('ai-play-pause-btn');
+        const aiPlayIcon = document.getElementById('ai-play-icon');
+        const aiPauseIcon = document.getElementById('ai-pause-icon');
+
+        // New elements for styling
+        const stylesBtn = document.getElementById('styles-btn');
+        const stylesPanel = document.getElementById('styles-panel');
+        const defaultStyleBtn = document.getElementById('default-style-btn');
+        const spongebobStyleBtn = document.getElementById('spongebob-style-btn');
+        const allThemedButtons = [playPauseBtn, generateBtn, aiPlayPauseBtn];
+        const allThemedInputs = [promptInput, songSelect];
+
+        // Bubble-related elements
+        const bubbleContainer = document.getElementById('bubble-container');
+
+        // Tone.js variables
+        let synth = null;
+        let part = null;
+
+        // API Key for Gemini API
+        const apiKey = "";
+        const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + apiKey;
+
+        // Function to update the play/pause button state for pre-loaded songs
+        function updateStaticPlayerButtonState() {
+            if (!audio.paused) {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+            } else {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+            }
+        }
+
+        // Function to update the play/pause button state for AI-generated songs
+        function updateAIPlayerButtonState() {
+            if (Tone.Transport.state === 'started') {
+                aiPlayIcon.classList.add('hidden');
+                aiPauseIcon.classList.remove('hidden');
+            } else {
+                aiPlayIcon.classList.remove('hidden');
+                aiPauseIcon.classList.add('hidden');
+            }
+        }
+
+        // Add a click listener to the pre-loaded play/pause button
+        playPauseBtn.addEventListener('click', () => {
+            stopGenerativeSong();
+            if (audio.paused) {
+                audio.play();
+            } else {
+                audio.pause();
+            }
+            updateStaticPlayerButtonState();
+        });
+
+        // Add a click listener to the AI-generated play/pause button
+        aiPlayPauseBtn.addEventListener('click', async () => {
+            // First, unlock the audio context if it's not already running
+            await Tone.start();
+
+            // Check the current state of the Tone.js transport
+            if (Tone.Transport.state === 'stopped' || Tone.Transport.state === 'paused') {
+                // If it's stopped, start the part from the beginning and then start the transport
+                part.start(0);
+                Tone.Transport.start();
+            } else {
+                // If it's already playing, stop the transport and reset to the beginning
+                Tone.Transport.stop();
+            }
+
+            // Update the button's icon to reflect the new state
+            updateAIPlayerButtonState();
+        });
+
+        // Add a change listener to the song selection dropdown
+        songSelect.addEventListener('change', (e) => {
+            stopGenerativeSong();
+            audio.src = e.target.value;
+            audio.load();
+            audio.play();
+            updateStaticPlayerButtonState();
+        });
+
+        // Listen for the audio to end to reset the button
+        audio.addEventListener('ended', () => {
+            audio.currentTime = 0; // Rewind the song
+            updateStaticPlayerButtonState();
+        });
+
+        // Listen for the Tone.js transport to stop and update button state
+        Tone.Transport.on('stop', () => {
+            updateAIPlayerButtonState();
+        });
+        
+        // --- New Generative Song Logic ---
+
+        // Function to stop the currently playing generative song
+        function stopGenerativeSong() {
+            Tone.Transport.cancel(); // Clears all scheduled events
+            Tone.Transport.stop();
+            if (synth) {
+                synth.dispose();
+            }
+            aiPlayerSection.classList.add('hidden');
+        }
+
+        generateBtn.addEventListener('click', async () => {
+            const prompt = promptInput.value;
+            if (!prompt) {
+                statusMessage.textContent = "Please enter a prompt!";
+                return;
+            }
+
+            // Stop any existing songs
+            audio.pause();
+            audio.currentTime = 0;
+            updateStaticPlayerButtonState();
+            stopGenerativeSong();
+
+            // UI state for loading
+            generateBtn.disabled = true;
+            generateText.textContent = "Generating...";
+            loadingSpinner.classList.remove('hidden');
+            statusMessage.textContent = "";
+
+            try {
+                statusMessage.textContent = "Requesting musical notes from the LLM...";
+
+                const llmPrompt = `Generate a simple, 4-bar instrumental theme song for "${prompt}". The output must be a single JSON object. The song should use only a C Major pentatonic scale (C4, D4, E4, G4, A4). Include a title for the song. The JSON structure should be:
+{
+  "songTitle": "[Generated Title]",
+  "notes": [
+    { "note": "C4", "duration": "4n" },
+    { "note": "E4", "duration": "8n" },
+    { "note": "G4", "duration": "8n" }
+  ]
+}
+The "note" value must be a valid musical note with octave (e.g., "C4", "G4", "D5"). The "duration" must be a valid Tone.js duration (e.g., "4n" for quarter note, "8n" for eighth note, "2n" for half note, "1n" for whole note). The total duration should be around 4 measures (16 quarter notes).`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: llmPrompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "songTitle": { "type": "STRING" },
+                                "notes": {
+                                    "type": "ARRAY",
+                                    "items": {
+                                        "type": "OBJECT",
+                                        "properties": {
+                                            "note": { "type": "STRING" },
+                                            "duration": { "type": "STRING" }
+                                        },
+                                        "required": ["note", "duration"]
+                                    }
+                                }
+                            },
+                            "required": ["songTitle", "notes"]
+                        }
+                    }
+                };
+
+                let attempt = 0;
+                const maxRetries = 3;
+                let response;
+
+                while (attempt < maxRetries) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) break;
+                        throw new Error(`API response status: ${response.status}`);
+                    } catch (err) {
+                        attempt++;
+                        if (attempt < maxRetries) {
+                            await new Promise(res => setTimeout(res, Math.pow(2, attempt) * 1000));
+                        } else {
+                            throw err;
+                        }
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(`API response error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) {
+                    throw new Error("Failed to get a valid JSON response from the API.");
+                }
+
+                const songData = JSON.parse(jsonText);
+                
+                // Show the AI player section and set the title
+                aiPlayerSection.classList.remove('hidden');
+                aiSongTitle.textContent = songData.songTitle;
+                statusMessage.textContent = "🎶 " + songData.songTitle + " is ready to play! Hit the play button! 🎶";
+
+                // Initialize the song in Tone.js but don't play it yet
+                initializeToneSong(songData);
+
+            } catch (error) {
+                console.error("Error generating song:", error);
+                statusMessage.textContent = "Oh no! An error occurred. Please try again! " + error.message;
+            } finally {
+                // Reset UI state
+                generateBtn.disabled = false;
+                generateText.textContent = "Generate Song";
+                loadingSpinner.classList.add('hidden');
+                updateStaticPlayerButtonState(); // Make sure button state is correct after generation
+            }
+        });
+
+        // Function to create and play the song with Tone.js
+        function initializeToneSong(songData) {
+            // Dispose of any previous synths and parts to prevent multiple sounds
+            if (synth) synth.dispose();
+            if (part) part.dispose();
+
+            // Create a new synth
+            synth = new Tone.Synth().toDestination();
+
+            // Use a Tone.Part to schedule the notes
+            part = new Tone.Part((time, value) => {
+                synth.triggerAttackRelease(value.note, value.duration, time);
+            }, songData.notes);
+
+            // Set the loop and loopEnd for the part
+            part.loop = true;
+            part.loopEnd = '4m';
+        }
+
+        // --- Styles Logic ---
+        stylesBtn.addEventListener('click', () => {
+            stylesPanel.classList.toggle('hidden');
+        });
+
+        defaultStyleBtn.addEventListener('click', () => {
+            applyStyle('default');
+            stylesPanel.classList.add('hidden');
+        });
+
+        spongebobStyleBtn.addEventListener('click', () => {
+            applyStyle('spongebob');
+            stylesPanel.classList.add('hidden');
+        });
+
+        function applyStyle(theme) {
+            // Remove all theme classes and default background classes first
+            body.classList.remove('spongebob-theme', 'bg-gradient-to-br', 'from-blue-300', 'to-indigo-500');
+
+            // Clear any existing bubbles
+            bubbleContainer.innerHTML = '';
+
+            if (theme === 'spongebob') {
+                body.classList.add('spongebob-theme');
+                allThemedButtons.forEach(btn => btn.classList.add('bubble-btn'));
+                createBubbles();
+            } else {
+                // Apply default background classes
+                body.classList.add('bg-gradient-to-br', 'from-blue-300', 'to-indigo-500');
+                allThemedButtons.forEach(btn => btn.classList.remove('bubble-btn'));
+            }
+        }
+
+        function createBubbles() {
+            const numBubbles = 50;
+            for (let i = 0; i < numBubbles; i++) {
+                const bubble = document.createElement('div');
+                const size = Math.random() * 20 + 10; // Bubbles from 10px to 30px
+                const x = Math.random() * 100; // Random x position from 0% to 100%
+                const duration = Math.random() * 15 + 10; // Float duration from 10s to 25s
+                const delay = Math.random() * 15; // Animation delay from 0s to 15s
+
+                bubble.classList.add('bubble');
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${x}%`;
+                bubble.style.animationDuration = `${duration}s`;
+                bubble.style.animationDelay = `${delay}s`;
+                bubble.style.setProperty('--x-offset', `${Math.random() * 100 - 50}px`); // Random sideways drift
+                
+                bubbleContainer.appendChild(bubble);
+            }
+        }
+    </script>
+
+</body>
+</html>
