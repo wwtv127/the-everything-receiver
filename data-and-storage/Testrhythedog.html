@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sora 2 API Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-gray-800 rounded-lg shadow-xl p-6 md:p-8 space-y-6">
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-white">Sora 2 API Interface</h1>
+            <p class="text-gray-400 mt-2">Enter your API key and prompt to generate content.</p>
+        </div>
+
+        <!-- Form Inputs -->
+        <div class="space-y-4">
+            <div>
+                <label for="apiKey" class="block text-sm font-medium text-gray-300 mb-2">API Key</label>
+                <input type="password" id="apiKey" name="apiKey" class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Enter your dk-******************** key">
+            </div>
+            <div>
+                <label for="prompt" class="block text-sm font-medium text-gray-300 mb-2">Prompt</label>
+                <textarea id="prompt" name="prompt" rows="4" class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="e.g., A cat programming in a futuristic city"></textarea>
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd" />
+            </svg>
+            <span>Generate</span>
+        </button>
+
+        <!-- Response Area -->
+        <div class="bg-gray-900 rounded-lg p-4 mt-6">
+            <h2 class="text-lg font-semibold text-white mb-2">API Response</h2>
+            <div id="loader" class="hidden loader ease-linear rounded-full border-4 border-t-4 border-gray-500 h-12 w-12 mx-auto my-4"></div>
+            <pre id="response" class="text-gray-300 text-sm whitespace-pre-wrap break-all"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Get DOM elements
+        const apiKeyInput = document.getElementById('apiKey');
+        const promptInput = document.getElementById('prompt');
+        const submitBtn = document.getElementById('submitBtn');
+        const responseOutput = document.getElementById('response');
+        const loader = document.getElementById('loader');
+
+        // Add event listener to the submit button
+        submitBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            const prompt = promptInput.value.trim();
+
+            // Basic validation
+            if (!apiKey) {
+                responseOutput.textContent = JSON.stringify({ error: "API Key is required." }, null, 2);
+                return;
+            }
+            if (!prompt) {
+                responseOutput.textContent = JSON.stringify({ error: "Prompt is required." }, null, 2);
+                return;
+            }
+
+            // Show loader and clear previous response
+            loader.classList.remove('hidden');
+            responseOutput.textContent = '';
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                // The API endpoint
+                const url = 'https://api.defapi.org/api/sora2/gen';
+
+                // Construct the request
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                // Check if the response is successful
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: "Failed to parse error response." }));
+                    throw new Error(`HTTP error! status: ${response.status} - ${JSON.stringify(errorData)}`);
+                }
+                
+                // Parse the JSON response
+                const data = await response.json();
+
+                // Display the formatted JSON response
+                responseOutput.textContent = JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                // Display any errors
+                responseOutput.textContent = JSON.stringify({ error: error.message }, null, 2);
+            } finally {
+                // Hide loader and re-enable the button
+                loader.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+    </script>
+</body>
+</html>
