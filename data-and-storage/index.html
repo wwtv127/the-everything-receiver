@@ -60,23 +60,16 @@
             if (pollingInterval) clearInterval(pollingInterval);
         };
         
-        // This function now receives a pre-validated, complete URL
         const pollStatus = (pollUrl) => {
             if (pollingInterval) clearInterval(pollingInterval);
-
             pollingInterval = setInterval(async () => {
                 try {
-                    // The fetch command is now simpler and safer
                     const response = await fetch(pollUrl);
                     const data = await response.json();
-                    
                     responseOutput.textContent = JSON.stringify(data, null, 2);
-
                     if (!response.ok) throw new Error(data.message || 'Failed to get status');
-                    
                     const statusData = data.data || {};
                     statusText.textContent = `Status: ${statusData.status || 'checking'}...`;
-
                     if (statusData.status === 'success') {
                         statusText.textContent = 'Video generated successfully!';
                         videoContainer.innerHTML = `<video controls autoplay muted class="w-full rounded-lg"><source src="${statusData.video_url}" type="video/mp4"></video>`;
@@ -98,7 +91,6 @@
                 statusText.textContent = "Prompt is required.";
                 return;
             }
-
             submitBtn.disabled = true;
             loader.classList.remove('hidden');
             statusText.textContent = '';
@@ -120,11 +112,13 @@
 
                 const taskId = genData.data ? genData.data.task_id : null;
                 
-                // Bulletproof validation for the Task ID
-                if (typeof taskId === 'string' && taskId !== '') {
+                if (typeof taskId === 'string' && taskId.trim() !== '') {
                     statusText.textContent = 'Task started. Periodically checking for result...';
-                    // THE DELICATE FIX: Construct the URL once, before polling.
-                    const safeUrl = `${serverUrl}/status/${encodeURIComponent(taskId)}`;
+
+                    // *** THE DELICATE FIX ***
+                    // Sanitize the string to remove ANY invalid characters, then build the URL.
+                    const sanitizedTaskId = taskId.replace(/[^a-zA-Z0-9-]/g, '');
+                    const safeUrl = `${serverUrl}/status/${sanitizedTaskId}`;
                     pollStatus(safeUrl);
                 } else {
                     throw new Error('API response did not contain a valid task_id.');
