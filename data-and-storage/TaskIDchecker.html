@@ -14,7 +14,6 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        video { aspect-ratio: 16 / 9; }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
@@ -32,7 +31,7 @@
         <div class="mt-8">
             <h2 class="text-lg font-semibold text-gray-800 mb-2">Result</h2>
             <p id="statusText" class="text-gray-600 mb-4 h-6"></p>
-            <div id="videoContainer" class="bg-black rounded-lg"></div>
+            <div id="videoContainer"></div>
             <h3 class="text-md font-semibold text-gray-800 mt-6 mb-2">Raw API Data</h3>
             <pre id="responseOutput" class="bg-gray-900 text-white text-sm rounded-md p-4 h-48 overflow-y-auto whitespace-pre-wrap break-all"></pre>
         </div>
@@ -46,13 +45,11 @@
         const videoContainer = document.getElementById('videoContainer');
         const responseOutput = document.getElementById('responseOutput');
         let pollingInterval;
-
         const resetUI = () => {
             checkBtn.disabled = false;
             loader.classList.add('hidden');
             if (pollingInterval) clearInterval(pollingInterval);
         };
-
         const pollStatus = (pollUrl) => {
             if (pollingInterval) clearInterval(pollingInterval);
             pollingInterval = setInterval(async () => {
@@ -65,10 +62,11 @@
                     statusText.textContent = `Status: ${statusData.status || 'checking'}...`;
                     if (statusData.status === 'success') {
                         statusText.textContent = 'Video generated successfully!';
-
-                        const proxyUrl = `${serverUrl}/video-proxy?url=${encodeURIComponent(statusData.video_url)}`;
-
-                        videoContainer.innerHTML = `<video controls autoplay muted class="w-full rounded-lg"><source src="${proxyUrl}" type="video/mp4"></video>`;
+                        // *** THE FIX: Show a direct link instead of an embedded player ***
+                        videoContainer.innerHTML = `
+                            <a href="${statusData.video_url}" target="_blank" class="inline-block px-6 py-3 bg-green-600 text-white font-semibold text-sm rounded-md shadow-sm hover:bg-green-700">
+                                View or Download Video
+                            </a>`;
                         resetUI();
                     } else if (statusData.status === 'failed') {
                         statusText.textContent = `Generation failed: ${statusData.error || 'Unknown error'}`;
@@ -80,7 +78,6 @@
                 }
             }, 4000);
         };
-
         checkBtn.addEventListener('click', () => {
             const taskId = taskIdInput.value.trim();
             if (typeof taskId !== 'string' || taskId === '') { statusText.textContent = "Task ID is required."; return; }
