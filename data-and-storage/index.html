@@ -52,8 +52,8 @@
         const responseOutput = document.getElementById('responseOutput');
         let pollingInterval;
 
-        // IMPORTANT: Replace this with your actual Render URL once deployed.
-        const serverUrl = 'https://sora-api-server.onrender.com'; // Use http://localhost:3000 for local testing
+        // Make sure this is your actual Render URL.
+        const serverUrl = 'https://sora-api-server.onrender.com';
 
         const resetUI = () => {
             submitBtn.disabled = false;
@@ -72,21 +72,21 @@
                     responseOutput.textContent = JSON.stringify(data, null, 2);
 
                     if (!response.ok) {
-                        throw new Error(data.error || 'Failed to get status');
+                        throw new Error(data.message || 'Failed to get status');
                     }
                     
-                    statusText.textContent = `Status: ${data.status || 'checking'}...`;
+                    statusText.textContent = `Status: ${data.data.status || 'checking'}...`;
 
-                    if (data.status === 'success') {
+                    if (data.data.status === 'success') {
                         statusText.textContent = 'Video generated successfully!';
                         videoContainer.innerHTML = `
                             <video controls autoplay muted class="w-full rounded-lg">
-                                <source src="${data.video_url}" type="video/mp4">
+                                <source src="${data.data.video_url}" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>`;
                         resetUI();
-                    } else if (data.status === 'failed') {
-                        statusText.textContent = `Generation failed: ${data.error || 'Unknown error'}`;
+                    } else if (data.data.status === 'failed') {
+                        statusText.textContent = `Generation failed: ${data.data.error || 'Unknown error'}`;
                         resetUI();
                     }
                 } catch (error) {
@@ -121,14 +121,18 @@
                 responseOutput.textContent = JSON.stringify(genData, null, 2);
 
                 if (!genResponse.ok) {
-                    throw new Error(genData.error || 'Failed to start generation');
+                    throw new Error(genData.message || 'Failed to start generation');
                 }
 
-                if (genData.task_id) {
+                // *** THIS IS THE FIX ***
+                // We now look inside genData.data for the task_id
+                const taskId = genData.data.task_id;
+
+                if (taskId) {
                     statusText.textContent = 'Task started. Periodically checking for result...';
-                    pollStatus(genData.task_id);
+                    pollStatus(taskId);
                 } else {
-                    throw new Error('API did not return a task_id.');
+                    throw new Error('API did not return a task_id in the data object.');
                 }
             } catch (error) {
                 statusText.textContent = `Error: ${error.message}`;
