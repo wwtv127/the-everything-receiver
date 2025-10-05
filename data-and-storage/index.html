@@ -66,6 +66,7 @@
 
             pollingInterval = setInterval(async () => {
                 try {
+                    // The taskId is now guaranteed to be a clean string for the URL
                     const response = await fetch(`${serverUrl}/status/${taskId}`);
                     const data = await response.json();
                     
@@ -124,13 +125,13 @@
                     throw new Error(genData.message || 'Failed to start generation');
                 }
 
-                // *** THIS IS THE FIX ***
-                // We now look inside genData.data for the task_id
                 const taskId = genData.data.task_id;
 
                 if (taskId) {
                     statusText.textContent = 'Task started. Periodically checking for result...';
-                    pollStatus(taskId);
+                    // *** THIS IS THE FIX ***
+                    // We sanitize the taskId to ensure it's a clean string before using it.
+                    pollStatus(String(taskId).trim());
                 } else {
                     throw new Error('API did not return a task_id in the data object.');
                 }
