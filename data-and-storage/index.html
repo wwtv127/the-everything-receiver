@@ -52,7 +52,6 @@
         const responseOutput = document.getElementById('responseOutput');
         let pollingInterval;
 
-        // Make sure this is your actual Render URL.
         const serverUrl = 'https://sora-api-server.onrender.com';
 
         const resetUI = () => {
@@ -66,8 +65,9 @@
 
             pollingInterval = setInterval(async () => {
                 try {
-                    // The taskId is now guaranteed to be a clean string for the URL
-                    const response = await fetch(`${serverUrl}/status/${taskId}`);
+                    // *** THIS IS THE FIX ***
+                    // We use encodeURIComponent to ensure the taskId is safe for the URL.
+                    const response = await fetch(`${serverUrl}/status/${encodeURIComponent(taskId)}`);
                     const data = await response.json();
                     
                     responseOutput.textContent = JSON.stringify(data, null, 2);
@@ -94,7 +94,7 @@
                     statusText.textContent = `Error checking status: ${error.message}`;
                     resetUI();
                 }
-            }, 4000); // Poll every 4 seconds
+            }, 4000);
         };
 
         submitBtn.addEventListener('click', async () => {
@@ -129,8 +129,7 @@
 
                 if (taskId) {
                     statusText.textContent = 'Task started. Periodically checking for result...';
-                    // *** THIS IS THE FIX ***
-                    // We sanitize the taskId to ensure it's a clean string before using it.
+                    // We still trim the string as good practice before passing it.
                     pollStatus(String(taskId).trim());
                 } else {
                     throw new Error('API did not return a task_id in the data object.');
