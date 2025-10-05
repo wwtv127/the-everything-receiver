@@ -46,11 +46,13 @@
         const videoContainer = document.getElementById('videoContainer');
         const responseOutput = document.getElementById('responseOutput');
         let pollingInterval;
+
         const resetUI = () => {
             submitBtn.disabled = false;
             loader.classList.add('hidden');
             if (pollingInterval) clearInterval(pollingInterval);
         };
+
         const pollStatus = (pollUrl) => {
             if (pollingInterval) clearInterval(pollingInterval);
             pollingInterval = setInterval(async () => {
@@ -59,11 +61,16 @@
                     const data = await response.json();
                     responseOutput.textContent = JSON.stringify(data, null, 2);
                     if (!response.ok) throw new Error(data.message || 'Failed to get status');
+                    
                     const statusData = data.data || {};
                     statusText.textContent = `Status: ${statusData.status || 'checking'}...`;
+
                     if (statusData.status === 'success') {
                         statusText.textContent = 'Video generated successfully!';
-                        videoContainer.innerHTML = `<video controls autoplay muted class="w-full rounded-lg"><source src="${statusData.video_url}" type="video/mp4"></video>`;
+                        
+                        const proxyUrl = `${serverUrl}/video-proxy?url=${encodeURIComponent(statusData.video_url)}`;
+                        
+                        videoContainer.innerHTML = `<video controls autoplay muted class="w-full rounded-lg"><source src="${proxyUrl}" type="video/mp4"></video>`;
                         resetUI();
                     } else if (statusData.status === 'failed') {
                         statusText.textContent = `Generation failed: ${statusData.error || 'Unknown error'}`;
@@ -75,12 +82,10 @@
                 }
             }, 4000);
         };
+
         submitBtn.addEventListener('click', async () => {
             const prompt = promptInput.value.trim();
-            if (!prompt) {
-                statusText.textContent = "Prompt is required.";
-                return;
-            }
+            if (!prompt) { statusText.textContent = "Prompt is required."; return; }
             submitBtn.disabled = true;
             loader.classList.remove('hidden');
             statusText.textContent = '';
