@@ -37,6 +37,8 @@
         <div class="mt-8">
             <h2 class="text-lg font-semibold text-gray-800 mb-2">Result</h2>
             <p id="statusText" class="text-gray-600 mb-4 h-6"></p>
+            <!-- NEW: Added a span to display the Task ID for debugging -->
+            <p class="text-xs text-gray-500 mb-4">Task ID: <span id="taskIdDebug" class="font-mono"></span></p>
             <div id="videoContainer" class="bg-black rounded-lg"></div>
             <h3 class="text-md font-semibold text-gray-800 mt-6 mb-2">Raw API Data</h3>
             <pre id="responseOutput" class="bg-gray-900 text-white text-sm rounded-md p-4 h-48 overflow-y-auto whitespace-pre-wrap break-all"></pre>
@@ -50,6 +52,7 @@
         const statusText = document.getElementById('statusText');
         const videoContainer = document.getElementById('videoContainer');
         const responseOutput = document.getElementById('responseOutput');
+        const taskIdDebug = document.getElementById('taskIdDebug'); // Get the new debug span
         let pollingInterval;
 
         const serverUrl = 'https://sora-api-server.onrender.com';
@@ -65,8 +68,6 @@
 
             pollingInterval = setInterval(async () => {
                 try {
-                    // *** THIS IS THE FIX ***
-                    // We use encodeURIComponent to ensure the taskId is safe for the URL.
                     const response = await fetch(`${serverUrl}/status/${encodeURIComponent(taskId)}`);
                     const data = await response.json();
                     
@@ -76,18 +77,20 @@
                         throw new Error(data.message || 'Failed to get status');
                     }
                     
-                    statusText.textContent = `Status: ${data.data.status || 'checking'}...`;
+                    // Nested data access is important here
+                    const statusData = data.data || {};
+                    statusText.textContent = `Status: ${statusData.status || 'checking'}...`;
 
-                    if (data.data.status === 'success') {
+                    if (statusData.status === 'success') {
                         statusText.textContent = 'Video generated successfully!';
                         videoContainer.innerHTML = `
                             <video controls autoplay muted class="w-full rounded-lg">
-                                <source src="${data.data.video_url}" type="video/mp4">
+                                <source src="${statusData.video_url}" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>`;
                         resetUI();
-                    } else if (data.data.status === 'failed') {
-                        statusText.textContent = `Generation failed: ${data.data.error || 'Unknown error'}`;
+                    } else if (statusData.status === 'failed') {
+                        statusText.textContent = `Generation failed: ${statusData.error || 'Unknown error'}`;
                         resetUI();
                     }
                 } catch (error) {
@@ -109,6 +112,7 @@
             statusText.textContent = '';
             videoContainer.innerHTML = '';
             responseOutput.textContent = '';
+            taskIdDebug.textContent = '...waiting...'; // Reset debug info
 
             try {
                 statusText.textContent = 'Sending prompt to server...';
@@ -124,15 +128,20 @@
                 if (!genResponse.ok) {
                     throw new Error(genData.message || 'Failed to start generation');
                 }
+                
+                // Nested data access
+                const taskId = genData.data ? genData.data.task_id : null;
+                
+                // Display the extracted taskId for debugging purposes
+                taskIdDebug.textContent = taskId || 'Not Found';
 
-                const taskId = genData.data.task_id;
-
-                if (taskId) {
+                // *** THIS IS THE BULLETPROOF FIX ***
+                // We check if taskId is a non-empty string before proceeding.
+                if (typeof taskId === 'string' && taskId.trim() !== '') {
                     statusText.textContent = 'Task started. Periodically checking for result...';
-                    // We still trim the string as good practice before passing it.
-                    pollStatus(String(taskId).trim());
+                    pollStatus(taskId);
                 } else {
-                    throw new Error('API did not return a task_id in the data object.');
+                    throw new Error('API response did not contain a valid task_id.');
                 }
             } catch (error) {
                 statusText.textContent = `Error: ${error.message}`;
