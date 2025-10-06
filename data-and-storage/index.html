@@ -3,31 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sora 2 API Interface</title>
+    <title>New Video API Interface</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .loader {
-            border: 4px solid #f3f3f3; border-top: 4px solid #3498db;
-            border-radius: 50%; width: 24px; height: 24px;
-            animation: spin 1s linear infinite;
-        }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
     <div class="w-full max-w-2xl mx-auto bg-white rounded-xl shadow-md p-8 m-4">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">Sora 2 Video Generator</h1>
-        <p class="text-gray-600 mb-6">Enter your prompt below to generate a video.</p>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Video Generator (muapi.ai)</h1>
+        <p class="text-gray-600 mb-6">Enter your prompt and select options to generate a video.</p>
+        
         <div class="mb-6">
             <label for="prompt" class="block text-sm font-medium text-gray-700 mb-2">Prompt</label>
-            <textarea id="prompt" rows="4" class="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., A stylish woman walks down a Tokyo street..."></textarea>
+            <textarea id="prompt" rows="4" class="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="A cyclist rides through a lively European street..."></textarea>
         </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                <label for="resolution" class="block text-sm font-medium text-gray-700 mb-2">Resolution</label>
+                <select id="resolution" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option>720p</option>
+                    <option>1080p</option>
+                </select>
+            </div>
+            <div>
+                <label for="aspect_ratio" class="block text-sm font-medium text-gray-700 mb-2">Aspect Ratio</label>
+                <select id="aspect_ratio" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option>16:9</option>
+                    <option>9:16</option>
+                    <option>1:1</option>
+                    <option>4:3</option>
+                </select>
+            </div>
+        </div>
+
         <button id="submitBtn" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
             <div id="loader" class="loader hidden mr-2"></div>
             Generate
         </button>
+
         <div class="mt-8">
             <h2 class="text-lg font-semibold text-gray-800 mb-2">Result</h2>
             <p id="statusText" class="text-gray-600 mb-4 h-6"></p>
@@ -39,17 +57,21 @@
     <script>
         const serverUrl = 'https://sora-api-server.onrender.com';
         const promptInput = document.getElementById('prompt');
+        const resolutionSelect = document.getElementById('resolution');
+        const aspectRatioSelect = document.getElementById('aspect_ratio');
         const submitBtn = document.getElementById('submitBtn');
         const loader = document.getElementById('loader');
         const statusText = document.getElementById('statusText');
         const videoContainer = document.getElementById('videoContainer');
         const responseOutput = document.getElementById('responseOutput');
         let pollingInterval;
+
         const resetUI = () => {
             submitBtn.disabled = false;
             loader.classList.add('hidden');
             if (pollingInterval) clearInterval(pollingInterval);
         };
+
         const pollStatus = (pollUrl) => {
             if (pollingInterval) clearInterval(pollingInterval);
             pollingInterval = setInterval(async () => {
@@ -57,52 +79,60 @@
                     const response = await fetch(pollUrl);
                     const data = await response.json();
                     responseOutput.textContent = JSON.stringify(data, null, 2);
-                    if (!response.ok) throw new Error(data.message || 'Failed to get status');
-                    const statusData = data.data || {};
-                    statusText.textContent = `Status: ${statusData.status || 'checking'}...`;
-                    if (statusData.status === 'success') {
+                    if (!response.ok) throw new Error(data.error || 'Failed to get status');
+                    
+                    const status = data.status;
+                    statusText.textContent = `Status: ${status || 'checking'}...`;
+
+                    if (status === 'completed') {
                         statusText.textContent = 'Video generated successfully!';
-                        // *** THE FIX: Show a direct link instead of an embedded player ***
-                        videoContainer.innerHTML = `
-                            <a href="${statusData.video_url}" target="_blank" class="inline-block px-6 py-3 bg-green-600 text-white font-semibold text-sm rounded-md shadow-sm hover:bg-green-700">
-                                View or Download Video
-                            </a>`;
+                        const videoUrl = data.outputs[0];
+                        videoContainer.innerHTML = `<a href="${videoUrl}" target="_blank" class="inline-block px-6 py-3 bg-green-600 text-white font-semibold text-sm rounded-md shadow-sm hover:bg-green-700">View or Download Video</a>`;
                         resetUI();
-                    } else if (statusData.status === 'failed') {
-                        statusText.textContent = `Generation failed: ${statusData.error || 'Unknown error'}`;
+                    } else if (status === 'failed') {
+                        statusText.textContent = `Generation failed: ${data.error || 'Unknown error'}`;
                         resetUI();
                     }
                 } catch (error) {
                     statusText.textContent = `Error checking status: ${error.message}`;
                     resetUI();
                 }
-            }, 4000);
+            }, 3000); // Poll every 3 seconds
         };
+
         submitBtn.addEventListener('click', async () => {
-            const prompt = promptInput.value.trim();
-            if (!prompt) { statusText.textContent = "Prompt is required."; return; }
+            const payload = {
+                prompt: promptInput.value.trim(),
+                resolution: resolutionSelect.value,
+                aspect_ratio: aspectRatioSelect.value
+            };
+            if (!payload.prompt) { statusText.textContent = "Prompt is required."; return; }
+            
             submitBtn.disabled = true;
             loader.classList.remove('hidden');
             statusText.textContent = '';
             videoContainer.innerHTML = '';
             responseOutput.textContent = '';
+
             try {
-                statusText.textContent = 'Sending prompt to server...';
+                statusText.textContent = 'Submitting task to server...';
                 const genResponse = await fetch(`${serverUrl}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
+                    body: JSON.stringify(payload)
                 });
+
                 const genData = await genResponse.json();
                 responseOutput.textContent = JSON.stringify(genData, null, 2);
-                if (!genResponse.ok) throw new Error(genData.message || 'Failed to start generation');
-                const taskId = genData.data ? genData.data.task_id : null;
-                if (typeof taskId === 'string' && taskId.trim() !== '') {
-                    statusText.textContent = 'Task started. Periodically checking for result...';
-                    const safeUrl = `${serverUrl}/task/${encodeURIComponent(taskId)}`;
+                if (!genResponse.ok) throw new Error(genData.error || 'Failed to start generation');
+                
+                const requestId = genData.request_id;
+                if (typeof requestId === 'string' && requestId.trim() !== '') {
+                    statusText.textContent = `Task submitted. Request ID: ${requestId}. Polling for result...`;
+                    const safeUrl = `${serverUrl}/task/${encodeURIComponent(requestId)}`;
                     pollStatus(safeUrl);
                 } else {
-                    throw new Error('API response did not contain a valid task_id.');
+                    throw new Error('API response did not contain a valid request_id.');
                 }
             } catch (error) {
                 statusText.textContent = `Error: ${error.message}`;
