@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>FL Studio Lite</title>
+  <script src="https://unpkg.com/tone@next/build/Tone.js"></script>
+  <style>
+    :root{--step:40px;--gap:6px;--cols:16}
+    body{font-family:system-ui, -apple-system, "Segoe UI", Roboto;background:#0f1114;color:#e8eef6;margin:18px;display:flex;flex-direction:column;align-items:center}
+    h1{font-size:18px;margin:0 0 12px}
+    .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+    button{padding:8px 12px;border-radius:6px;border:0;background:#2f7cff;color:white;cursor:pointer}
+    .small{padding:6px 8px;background:#1a1c20;border-radius:8px;color:#cfe}
+    .wrap{position:relative;width:100%;max-width:980px}
+    .grid{display:grid;grid-template-columns:120px repeat(var(--cols),var(--step));gap:var(--gap);padding:8px;background:#0b0c0f;border-radius:10px}
+    .label{display:flex;align-items:center;justify-content:center;background:#141619;border-radius:8px;padding:6px 8px;cursor:pointer;user-select:none;font-size:13px}
+    .step{width:var(--step);height:var(--step);background:#15171a;border-radius:8px;cursor:pointer;transition:background .06s}
+    .step.active{background:#2ecc71}
+    .playhead{position:absolute;top:8px;left:8px;height:0;width:calc(var(--step)+var(--gap));background:rgba(30,144,255,0.18);border-radius:8px;pointer-events:none;transform:translateX(120px);transition:transform .05s linear;box-shadow:inset 0 0 14px rgba(30,144,255,0.06)}
+    .playhead::after{content:"";position:absolute;left:0;top:0;width:3px;height:100%;background:rgba(30,144,255,0.95);border-top-left-radius:8px;border-bottom-left-radius:8px}
+    .effects-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;padding:8px;background:#0c0d10;border-radius:10px;margin-top:14px;width:100%;max-width:980px}
+    .fx-card{width:170px;background:#131416;border-radius:8px;padding:8px;color:#dfe6ee;display:flex;flex-direction:column;gap:8px}
+    .fx-name{font-weight:600;font-size:14px}
+    .fx-row{display:flex;gap:8px;align-items:center}
+    .toggle{padding:6px 8px;background:#263043;border-radius:6px;border:0;color:#cfe;cursor:pointer}
+    .locked{opacity:0.55;background:linear-gradient(90deg,#222 0,#1a1616 100);border:1px dashed #444}
+    .knob{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    input[type="range"]{width:100%}
+    .promo{padding:10px 12px;background:#1b1b1f;border-radius:8px;color:#cfe;margin-top:8px;font-size:13px}
+    .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#0d0f12;padding:18px;border-radius:10px;box-shadow:0 8px 36px rgba(0,0,0,0.6);color:#e6eef8;z-index:999}
+    .modal button{background:#2f7cff;color:white;padding:6px 10px;border-radius:6px;border:0}
+    @media(max-width:840px){.fx-card{width:48%}}
+    @media(max-width:520px){.fx-card{width:100%}}
+  </style>
+</head>
+<body>
+  <h1>FL Studio Lite</h1>
+
+  <div class="toolbar">
+    <button id="playBtn">Play</button>
+    <div class="small">BPM <input id="bpm" type="range" min="60" max="200" value="120" step="1" style="vertical-align:middle;margin-left:8px"> <strong id="bpmVal">120</strong></div>
+    <div class="small">Rows <select id="rowsSel" style="background:transparent;border:0;color:#e8eef6"><option>4</option><option>6</option><option selected>8</option><option>12</option><option>16</option></select></div>
+  </div>
+
+  <div class="wrap">
+    <div class="grid" id="grid"></div>
+    <div class="playhead" id="playhead" aria-hidden="true"></div>
+  </div>
+
+  <div class="effects-bar" id="effectsBar" aria-hidden="false"></div>
+
+  <div id="modal" class="modal" style="display:none">
+    <div id="modalText"></div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button id="closeModal">Close</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------- core constants ----------
+    const pcs = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+    const chromatic = [];
+    for (let o=2;o<=6;o++) for (let p of pcs) chromatic.push(p + o);
+    const lastIndex = chromatic.indexOf("C6");
+    const NOTES = chromatic.slice(0, lastIndex + 1);
+    const COLS = 16;
+    let ROWS = 8;
+
+    // DOM refs
+    const grid = document.getElementById('grid');
+    const playBtn = document.getElementById('playBtn');
+    const playhead = document.getElementById('playhead');
+    const bpm = document.getElementById('bpm');
+    const bpmVal = document.getElementById('bpmVal');
+    const rowsSel = document.getElementById('rowsSel');
+    const effectsBar = document.getElementById('effectsBar');
+    const modal = document.getElementById('modal');
+    const modalText = document.getElementById('modalText');
+    const closeModal = document.getElementById('closeModal');
+
+    bpmVal.textContent = bpm.value;
+    Tone.Transport.bpm.value = Number(bpm.value);
+    bpm.addEventListener('input', e => {
+      const v = Number(e.target.value);
+      Tone.Transport.bpm.rampTo(v, 0.05);
+      bpmVal.textContent = v;
+    });
+
+    // ---------- synth + effects ----------
+    const synth = new Tone.PolySynth(Tone.FMSynth, {oscillator:{type:"sine"},envelope:{attack:0.004,decay:0.18,sustain:0.6,release:0.9}});
+    const fx = {
+      reverb: new Tone.Reverb({decay:2.0,wet:0.18}),
+      delay: new Tone.FeedbackDelay("8n", 0.25),
+      chorus: new Tone.Chorus(4, 2.5, 0.5)
+    };
+    fx.chorus.start();
+
+    let wetChain = [];
+    function rebuildChain(){
+      try { synth.disconnect(); } catch {}
+      Object.values(fx).forEach(n => { try { n.disconnect(); } catch {} });
+      let node = synth;
+      for (const key of wetChain){
+        node.connect(fx[key]);
+        node = fx[key];
+      }
+      node.toDestination();
+    }
+    synth.toDestination();
+
+    // ---------- sequencer matrix ----------
+    let stepMatrix = []; // [row][col] => element
+    let rowNotes = [];   // row -> note string
+
+    function buildGrid(rows){
+      ROWS = rows;
+      document.documentElement.style.setProperty('--rows', rows);
+      grid.innerHTML = '';
+      stepMatrix = [];
+      rowNotes = [];
+      for (let r=0;r<rows;r++){
+        const label = document.createElement('div');
+        label.className = 'label';
+        const defIndex = Math.max(0, Math.floor((NOTES.length - 1) * (1 - r / (rows - 1 || 1))));
+        label.textContent = NOTES[defIndex];
+        label.dataset.noteIndex = defIndex;
+        label.title = 'Click to go up a semitone. Shift+click to go down.';
+        label.addEventListener('click',(ev)=> {
+          let idx = Number(label.dataset.noteIndex);
+          idx = ev.shiftKey ? (idx - 1 + NOTES.length) % NOTES.length : (idx + 1) % NOTES.length;
+          label.dataset.noteIndex = idx; label.textContent = NOTES[idx]; rowNotes[r] = NOTES[idx];
+        });
+        grid.appendChild(label);
+        rowNotes.push(NOTES[defIndex]);
+
+        const rowArr = [];
+        for (let c=0;c<COLS;c++){
+          const s = document.createElement('div');
+          s.className = 'step';
+          s.dataset.r = r; s.dataset.c = c;
+          s.addEventListener('click', ()=> s.classList.toggle('active'));
+          grid.appendChild(s);
+          rowArr.push(s);
+        }
+        stepMatrix.push(rowArr);
+      }
+      playhead.style.height = `calc(var(--step) * ${rows} + var(--gap) * (${rows} - 1))`;
+      requestAnimationFrame(()=> movePlayhead(0));
+    }
+
+    buildGrid(ROWS);
+    rowsSel.addEventListener('change', ()=> buildGrid(Number(rowsSel.value)));
+
+    // ---------- playhead and scheduling ----------
+    let playing = false;
+    let col = 0;
+    let eventId = null;
+
+    function movePlayhead(c){
+      if (!stepMatrix.length || !stepMatrix[0][c]) return;
+      const first = stepMatrix[0][c];
+      const gridRect = grid.getBoundingClientRect();
+      const stepRect = first.getBoundingClientRect();
+      const offset = stepRect.left - gridRect.left;
+      playhead.style.transform = `translateX(${offset}px)`;
+    }
+
+    async function startPlayback(){
+      await Tone.start();
+      Tone.Transport.stop(); Tone.Transport.cancel();
+      col = 0; movePlayhead(0);
+
+      eventId = Tone.Transport.scheduleRepeat((time)=>{
+        for (let r=0;r<ROWS;r++){
+          const stepEl = stepMatrix[r][col];
+          if (stepEl && stepEl.classList.contains('active')){
+            const note = rowNotes[r] || NOTES[0];
+            synth.triggerAttackRelease(note, "8n", time);
+          }
+        }
+        requestAnimationFrame(()=> movePlayhead(col));
+        col = (col + 1) % COLS;
+      }, "16n");
+
+      Tone.Transport.start();
+    }
+
+    function stopPlayback(){
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      eventId = null;
+      col = 0;
+      movePlayhead(0);
+    }
+
+    playBtn.addEventListener('click', async ()=>{
+      if (!playing){
+        playBtn.disabled = true; playBtn.textContent = 'Starting...';
+        try { await startPlayback(); playing = true; playBtn.textContent = 'Stop'; }
+        catch(e){ console.error(e); playBtn.textContent = 'Play'; }
+        finally { playBtn.disabled = false; }
+      } else {
+        stopPlayback(); playing = false; playBtn.textContent = 'Play';
+      }
+    });
+
+    window.addEventListener('resize', ()=> movePlayhead(col));
+
+    // ---------- effects UI (3 unlocked, others locked) ----------
+    const EFFECTS_META = [
+      {key:'reverb', name:'Reverb', unlocked:true, param:{label:'Decay', min:0.5, max:6, step:0.1, prop:'decay', default:2.0}},
+      {key:'delay',  name:'Delay',  unlocked:true, param:{label:'Feedback', min:0, max:0.9, step:0.01, prop:'feedback', default:0.25}},
+      {key:'chorus', name:'Chorus', unlocked:true, param:{label:'Depth', min:0, max:1, step:0.01, prop:'depth', default:0.5}},
+      {key:'fx4', name:'Phaser', unlocked:false},
+      {key:'fx5', name:'Flanger', unlocked:false},
+      {key:'fx6', name:'Distort', unlocked:false},
+      {key:'fx7', name:'Compressor', unlocked:false},
+      {key:'fx8', name:'EQ', unlocked:false},
+      {key:'fx9', name:'Tremolo', unlocked:false},
+      {key:'fx10', name:'Bitcrusher', unlocked:false},
+      {key:'fx11', name:'Stereo Wid', unlocked:false},
+      {key:'fx12', name:'AutoPan', unlocked:false},
+      {key:'fx13', name:'Filter', unlocked:false}
+    ];
+
+    function showModal(text){
+      modalText.textContent = text;
+      modal.style.display = 'block';
+    }
+    closeModal.addEventListener('click', ()=> modal.style.display = 'none');
+
+    function createFxCard(meta){
+      const card = document.createElement('div'); card.className = 'fx-card';
+      if (!meta.unlocked) card.classList.add('locked');
+      const title = document.createElement('div'); title.className = 'fx-name'; title.textContent = meta.name;
+      card.appendChild(title);
+
+      if (meta.unlocked){
+        const row = document.createElement('div'); row.className = 'fx-row';
+        const toggle = document.createElement('button'); toggle.className = 'toggle'; toggle.textContent = 'Off';
+        toggle.dataset.on = 'false';
+        toggle.addEventListener('click', ()=>{
+          const on = toggle.dataset.on === 'true';
+          if (!on){
+            toggle.dataset.on = 'true'; toggle.textContent = 'On';
+            if (!wetChain.includes(meta.key)) wetChain.push(meta.key);
+          } else {
+            toggle.dataset.on = 'false'; toggle.textContent = 'Off';
+            const idx = wetChain.indexOf(meta.key); if (idx !== -1) wetChain.splice(idx,1);
+          }
+          rebuildChain();
+        });
+        row.appendChild(toggle);
+        card.appendChild(row);
+
+        if (meta.param){
+          const knobRow = document.createElement('div'); knobRow.className = 'knob';
+          const lbl = document.createElement('div'); lbl.textContent = meta.param.label; lbl.style.fontSize='13px';
+          const input = document.createElement('input'); input.type='range';
+          input.min = meta.param.min; input.max = meta.param.max; input.step = meta.param.step; input.value = meta.param.default;
+          const node = fx[meta.key];
+          if (node){
+            try {
+              if (meta.key === 'reverb') node.decay = Number(input.value);
+              if (meta.key === 'delay') node.feedback.value = Number(input.value);
+              if (meta.key === 'chorus') node.depth = Number(input.value);
+              if (meta.key === 'reverb') node.wet.value = 0.18;
+              if (meta.key === 'delay') node.wet.value = 0.18;
+              if (meta.key === 'chorus') node.wet.value = 0.15;
+            } catch(e){}
+          }
+          input.addEventListener('input', (e)=>{
+            const v = Number(e.target.value);
+            const node = fx[meta.key];
+            if (!node) return;
+            if (meta.key === 'reverb' && meta.param.prop === 'decay') node.decay = v;
+            if (meta.key === 'delay' && meta.param.prop === 'feedback') node.feedback.value = v;
+            if (meta.key === 'chorus' && meta.param.prop === 'depth') node.depth = v;
+          });
+          knobRow.appendChild(lbl); knobRow.appendChild(input);
+          card.appendChild(knobRow);
+        }
+      } else {
+        const promo = document.createElement('div'); promo.className = 'promo';
+        // updated locked messaging per request
+        promo.textContent = 'Get the full FL Studio to unlock this effect';
+        promo.addEventListener('click', ()=> showModal('Get the full FL Studio to unlock this effect'));
+        card.appendChild(promo);
+      }
+      return card;
+    }
+
+    // build effects UI
+    EFFECTS_META.forEach(meta => {
+      const c = createFxCard(meta);
+      effectsBar.appendChild(c);
+    });
+
+    // keep modal hide on outside click
+    window.addEventListener('click', (e)=> {
+      if (modal.style.display === 'block' && !modal.contains(e.target)) modal.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
