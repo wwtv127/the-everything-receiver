@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unstable Unicorns - Multiplayer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Lobby Styles */
+        .lobby {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin: 50px auto;
+        }
+
+        .lobby h1 {
+            color: #764ba2;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .lobby-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1.1em;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #764ba2;
+        }
+
+        .room-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .room-code {
+            font-size: 2em;
+            font-weight: bold;
+            color: #764ba2;
+            text-align: center;
+            margin: 10px 0;
+            letter-spacing: 5px;
+        }
+
+        .players-list {
+            margin-top: 20px;
+        }
+
+        .players-list h3 {
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .player-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-item.host::after {
+            content: "HOST";
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-size: 0.8em;
+        }
+
+        /* Game Board Styles */
+        .game-board {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .game-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .turn-indicator {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .phase-indicator {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 5px;
+        }
+
+        .game-area {
+            display: grid;
+            grid-template-columns: 200px 1fr 200px;
+            gap: 20px;
+        }
+
+        .deck-area {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .deck {
+            background: #333;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }
+
+        .deck:hover {
+            transform: scale(1.05);
+        }
+
+        .discard-pile {
+            background: #6c757d;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            min-height: 100px;
+        }
+
+        .main-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .opponents-area {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .opponent-stable {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 200px;
+            flex: 1;
+        }
+
+        .stable-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .my-stable {
+            background: #d1f2eb;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 200px;
+        }
+
+        .my-hand {
+            background: #fff3cd;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .hand-cards {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .card {
+            background: white;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            width: 120px;
+            min-height: 160px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .card.selected {
+            border-color: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+        }
+
+        .card-type {
+            font-size: 0.7em;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .card-name {
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .card-description {
+            font-size: 0.7em;
+            color: #555;
+            flex-grow: 1;
+        }
+
+        .card.unicorn {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+        }
+
+        .card.magic {
+            background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+            color: white;
+        }
+
+        .card.instant {
+            background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
+            color: white;
+        }
+
+        .card.upgrade {
+            background: linear-gradient(135deg, #55efc4 0%, #00b894 100%);
+        }
+
+        .card.downgrade {
+            background: linear-gradient(135deg, #fab1a0 0%, #e17055 100%);
+        }
+
+        .card.baby {
+            background: linear-gradient(135deg, #81ecec 0%, #74b9ff 100%);
+        }
+
+        .stable-cards {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            min-height: 100px;
+        }
+
+        .action-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-button {
+            padding: 10px 20px;
+            font-size: 0.9em;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            color: #764ba2;
+            margin-bottom: 20px;
+        }
+
+        .target-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .target-option {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .target-option:hover {
+            border-color: #764ba2;
+            background: #f8f9fa;
+        }
+
+        .game-log {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 5px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 0.9em;
+        }
+
+        .win-screen {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            z-index: 2000;
+        }
+
+        .win-screen h1 {
+            color: #28a745;
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .game-area {
+                grid-template-columns: 1fr;
+            }
+
+            .card {
+                width: 100px;
+                min-height: 140px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Lobby Screen -->
+        <div id="lobby" class="lobby">
+            <h1>🦄 Unstable Unicorns</h1>
+            
+            <div id="initial-menu">
+                <div class="lobby-buttons">
+                    <button onclick="createRoom()">Create Room</button>
+                    <button onclick="showJoinRoom()">Join Room</button>
+                </div>
+            </div>
+
+            <div id="join-room" style="display: none;">
+                <h2>Join Room</h2>
+                <input type="text" id="room-code-input" placeholder="Enter 5-digit room code" maxlength="5">
+                <input type="text" id="player-name-input" placeholder="Enter your name">
+                <button onclick="joinRoom()">Join</button>
+                <button onclick="backToMenu()">Back</button>
+            </div>
+
+            <div id="room-lobby" style="display: none;">
+                <div class="room-info">
+                    <h2>Room Code:</h2>
+                    <div class="room-code" id="room-code-display"></div>
+                    
+                    <div class="players-list">
+                        <h3>Players:</h3>
+                        <div id="players-list"></div>
+                    </div>
+                    
+                    <button id="start-game-btn" onclick="startGame()" style="display: none; margin-top: 20px; width: 100%;">
+                        Start Game (Min 2 players)
+                    </button>
+                    <button onclick="leaveRoom()" style="margin-top: 10px; width: 100%;">Leave Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Board -->
+        <div id="game-board" class="game-board">
+            <div class="game-header">
+                <div class="turn-indicator" id="turn-indicator">Current Turn: Player 1</div>
+                <div class="phase-indicator" id="phase-indicator">Beginning Phase</div>
+                <div>Unicorns to Win: <span id="win-condition">7</span></div>
+            </div>
+
+            <div class="game-area">
+                <div class="deck-area">
+                    <div class="deck" onclick="drawCard()">
+                        <div>Draw Deck</div>
+                        <div id="deck-count">0 cards</div>
+                    </div>
+                    <div class="discard-pile">
+                        <div>Discard Pile</div>
+                        <div id="discard-count">0 cards</div>
+                    </div>
+                    <div class="game-log">
+                        <h4>Game Log:</h4>
+                        <div id="game-log-entries"></div>
+                    </div>
+                </div>
+
+                <div class="main-area">
+                    <div class="opponents-area" id="opponents-area">
+                        <!-- Opponent stables will be dynamically added here -->
+                    </div>
+
+                    <div class="my-stable">
+                        <div class="stable-header">My Stable (<span id="my-unicorn-count">0</span> Unicorns)</div>
+                        <div class="stable-cards" id="my-stable-cards"></div>
+                    </div>
+
+                    <div class="my-hand">
+                        <div class="stable-header">My Hand</div>
+                        <div class="hand-cards" id="hand-cards"></div>
+                    </div>
+                </div>
+
+                <div class="deck-area">
+                    <h3>Game Info</h3>
+                    <div style="margin-top: 10px; font-size: 0.9em;">
+                        <p><strong>Phase:</strong></p>
+                        <p id="current-phase-info">Beginning</p>
+                        <p style="margin-top: 10px;"><strong>Actions:</strong></p>
+                        <p id="actions-remaining">1 remaining</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="action-button" onclick="playSelectedCard()">Play Card</button>
+                <button class="action-button" onclick="endTurn()">End Turn</button>
+            </div>
+        </div>
+
+        <!-- Target Selection Modal -->
+        <div id="target-modal" class="modal">
+            <div class="modal-content">
+                <h2>Select Target</h2>
+                <div id="target-list" class="target-list"></div>
+                <button onclick="closeTargetModal()" style="margin-top: 20px;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        let gameState = {
+            roomCode: null,
+            players: [],
+            currentPlayer: null,
+            isHost: false,
+            myPlayerId: null,
+            gameStarted: false,
+            currentTurn: 0,
+            currentPhase: 'beginning', // beginning, draw, action, end
+            deck: [],
+            discardPile: [],
+            hands: {},
+            stables: {},
+            upgrades: {},
+            downgrades: {},
+            selectedCard: null,
+            actionsRemaining: 1,
+            drawnThisTurn: false,
+            winCondition: 7
+        };
+
+        // Card Definitions
+        const cardDefinitions = {
+            babyUnicorns: [
+                {id: 'baby1', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby2', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby3', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby4', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby5', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby6', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby7', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby8', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'}
+            ],
+            basicUnicorns: [
+                {id: 'basic1', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic2', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic3', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic4', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic5', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic6', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic7', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic8', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic9', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
+                {id: 'basic10', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'}
+            ],
+            magicalUnicorns: [
+                {id: 'magical1', type: 'unicorn', name: 'Rainbow Unicorn', description: 'When this enters your stable, bring a Basic Unicorn from your hand to your stable', effect: 'onEnter'},
+                {id: 'magical2', type: 'unicorn', name: 'Extremely Destructive Unicorn', description: 'When this enters your stable, each player must sacrifice a unicorn', effect: 'onEnter'},
+                {id: 'magical3', type: 'unicorn', name: 'Unicorn Phoenix', description: 'If this is sacrificed or destroyed, bring it back to your stable at the end of turn', effect: 'persistent'},
+                {id: 'magical4', type: 'unicorn', name: 'Magical Kittencorn', description: 'This cannot be destroyed by magic cards', effect: 'persistent'},
+                {id: 'magical5', type: 'unicorn', name: 'Stabby Unicorn', description: 'When this enters your stable, destroy an upgrade or downgrade', effect: 'onEnter'},
+                {id: 'magical6', type: 'unicorn', name: 'Puppicorn', description: 'When this enters your stable, draw a card', effect: 'onEnter'},
+                {id: 'magical7', type: 'unicorn', name: 'Rhinocorn', description: 'When this enters your stable, destroy a unicorn', effect: 'onEnter'},
+                {id: 'magical8', type: 'unicorn', name: 'Extremely Fertile Unicorn', description: 'When you play a unicorn, immediately play another from hand', effect: 'persistent'},
+                {id: 'magical9', type: 'unicorn', name: 'Llamacorn', description: 'When this enters play, each player must discard a card', effect: 'onEnter'},
+                {id: 'magical10', type: 'unicorn', name: 'Americorn', description: 'All your unicorns count as 2 unicorns', effect: 'persistent'}
+            ],
+            magicCards: [
+                {id: 'magic1', type: 'magic', name: 'Unicorn Poison', description: 'Destroy a unicorn', effect: 'destroy'},
+                {id: 'magic2', type: 'magic', name: 'Back Kick', description: 'Return a unicorn to its owner\'s hand', effect: 'return'},
+                {id: 'magic3', type: 'magic', name: 'Change of Luck', description: 'Draw 2 cards and discard 3 cards', effect: 'draw'},
+                {id: 'magic4', type: 'magic', name: 'Glitter Tornado', description: 'Return all cards in hand to deck, shuffle, draw same amount', effect: 'shuffle'},
+                {id: 'magic5', type: 'magic', name: 'Unicorn Swap', description: 'Swap a unicorn in your stable with one in another stable', effect: 'swap'},
+                {id: 'magic6', type: 'magic', name: 'Re-Target', description: 'Move an upgrade or downgrade to another player', effect: 'move'},
+                {id: 'magic7', type: 'magic', name: 'Unfair Bargain', description: 'Trade a card in hand with a random card from another player', effect: 'trade'},
+                {id: 'magic8', type: 'magic', name: 'Two-For-One', description: 'Sacrifice a unicorn, then destroy 2 unicorns', effect: 'sacrifice'},
+                {id: 'magic9', type: 'magic', name: 'Unicorn Shrinkray', description: 'Choose a player. Their unicorns count as baby unicorns until your next turn', effect: 'shrink'},
+                {id: 'magic10', type: 'magic', name: 'Targeted Destruction', description: 'Destroy an upgrade or downgrade', effect: 'destroyUpgrade'}
+            ],
+            instantCards: [
+                {id: 'instant1', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
+                {id: 'instant2', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
+                {id: 'instant3', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
+                {id: 'instant4', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
+                {id: 'instant5', type: 'instant', name: 'Super Neigh', description: 'Stop any card that cannot be Neighed', effect: 'superCounter'},
+                {id: 'instant6', type: 'instant', name: 'Yay', description: 'Play immediately when someone plays a unicorn. Steal that unicorn', effect: 'steal'}
+            ],
+            upgradeCards: [
+                {id: 'upgrade1', type: 'upgrade', name: 'Double Dutch', description: 'Play 2 cards in action phase', effect: 'doubleAction'},
+                {id: 'upgrade2', type: 'upgrade', name: 'Glitter Bomb', description: 'When you play a unicorn, destroy a card', effect: 'destroyOnPlay'},
+                {id: 'upgrade3', type: 'upgrade', name: 'Rainbow Aura', description: 'Your unicorns cannot be destroyed', effect: 'protection'},
+                {id: 'upgrade4', type: 'upgrade', name: 'Summoning Ritual', description: 'Draw an extra card each turn', effect: 'extraDraw'},
+                {id: 'upgrade5', type: 'upgrade', name: 'Unicorn Lasso', description: 'When you play an upgrade, steal a unicorn until end of turn', effect: 'steal'}
+            ],
+            downgradeCards: [
+                {id: 'downgrade1', type: 'downgrade', name: 'Barbed Wire', description: 'You cannot play upgrade cards', effect: 'noUpgrades'},
+                {id: 'downgrade2', type: 'downgrade', name: 'Broken Stable', description: 'You can only have 5 unicorns max', effect: 'limitUnicorns'},
+                {id: 'downgrade3', type: 'downgrade', name: 'Blinding Light', description: 'All your unicorns are basic unicorns', effect: 'makeBasic'},
+                {id: 'downgrade4', type: 'downgrade', name: 'Tiny Stable', description: 'You cannot play unicorns if you have 4 or more', effect: 'tinyStable'},
+                {id: 'downgrade5', type: 'downgrade', name: 'Slowdown', description: 'You can only play one card every other turn', effect: 'slowdown'}
+            ]
+        };
+
+        // Initialize Local Storage for multiplayer simulation
+        function initLocalMultiplayer() {
+            if (!localStorage.getItem('unstableRooms')) {
+                localStorage.setItem('unstableRooms', JSON.stringify({}));
+            }
+        }
+
+        // Generate random 5-digit room code
+        function generateRoomCode() {
+            return Math.floor(10000 + Math.random() * 90000).toString();
+        }
+
+        // Create Room
+        function createRoom() {
+            const playerName = prompt("Enter your name:");
+            if (!playerName) return;
+
+            const roomCode = generateRoomCode();
+            const playerId = Date.now().toString();
+            
+            gameState.roomCode = roomCode;
+            gameState.isHost = true;
+            gameState.myPlayerId = playerId;
+            gameState.currentPlayer = {
+                id: playerId,
+                name: playerName,
+                isHost: true
+            };
+            
+            const roomData = {
+                code: roomCode,
+                host: playerId,
+                players: [{
+                    id: playerId,
+                    name: playerName,
+                    isHost: true
+                }],
+                gameStarted: false,
+                gameState: null
+            };
+            
+            const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
+            rooms[roomCode] = roomData;
+            localStorage.setItem('unstableRooms', JSON.stringify(rooms));
+            
+            showRoomLobby();
+            startRoomPolling();
+        }
+
+        // Show join room interface
+        function showJoinRoom() {
+            document.getElementById('initial-menu').style.display = 'none';
+            document.getElementById('join-room').style.display = 'block';
+        }
+
+        // Join Room
+        function joinRoom() {
+            const roomCode = document.getElementById('room-code-input').value;
+            const playerName = document.getElementById('player-name-input').value;
+            
+            if (roomCode.length !== 5 || !playerName) {
+                alert('Please enter a valid 5-digit room code and your name');
+                return;
+            }
+            
+            const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
+            if (!rooms[roomCode]) {
+                alert('Room not found!');
+                return;
+            }
+            
+            if (rooms[roomCode].gameStarted) {
+                alert('Game already in progress!');
+                return;
+            }
+            
+            const playerId = Date.now().toString();
+            const newPlayer = {
+                id: playerId,
+                name: playerName,
+                isHost: false
+            };
+            
+            rooms[roomCode].players.push(newPlayer);
+            localStorage.setItem('unstableRooms', JSON.stringify(rooms));
+            
+            gameState.roomCode = roomCode;
+            gameState.myPlayerId = playerId;
+            gameState.currentPlayer = newPlayer;
+            gameState.isHost = false;
+            
+            showRoomLobby();
+            startRoomPolling();
+        }
+
+        // Back to menu
+        function backToMenu() {
+            document.getElementById('join-room').style.display = 'none';
+            document.getElementById('initial-menu').style.display = 'block';
+        }
+
+        // Show room lobby
+        function showRoomLobby() {
+            document.getElementById('initial-menu').style.display = 'none';
+            document.getElementById('join-room').style.display = 'none';
+            document.getElementById('room-lobby').style.display = 'block';
+            
+            document.getElementById('room-code-display').textContent = gameState.roomCode;
+            
+            if (gameState.isHost) {
+                document.getElementById('start-game-btn').style.display = 'block';
+            }
+            
+            updatePlayersList();
+        }
+
+        // Update players list
+        function updatePlayersList() {
+            const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
+            if (!rooms[gameState.roomCode]) return;
+            
+            const players = rooms[gameState.roomCode].players;
+            gameState.players = players;
+            
+            const listElement = document.getElementById('players-list');
+            listElement.innerHTML = '';
+            
+            players.forEach(player => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-item' + (player.isHost ? ' host' : '');
+                playerDiv.textContent = player.name;
+                listElement.appendChild(playerDiv);
+            });
+            
+            // Enable start button if enough players
+            if (gameState.isHost && players.length >= 2) {
+                document.getElementById('start-game-btn').disabled = false;
+            }
+        }
+
+        // Room polling for updates
+        let pollingInterval;
+        function startRoomPolling() {
+            pollingInterval = setInterval(() => {
+                const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
+                if (!rooms[gameState.roomCode]) {
+                    clearInterval(pollingInterval);
+                    alert('Room has been closed');
+                    location.reload();
+                    return;
+                }
+                
+                const room = rooms[gameState.roomCode];
+                
+                // Update players list
+                if (room.players.length !== gameState.players.length) {
+                    updatePlayersList();
+                }
+                
+                // Check if game started
+                if (room.gameStarted && !gameState.gameStarted) {
+                    gameState = {...gameState, ...room.gameState};
+                    gameState.gameStarted = true;
+                    initializeGame();
+                }
+                
+                // Update game state if in game
+                if (room.gameStarted && room.gameState) {
+                    const latestState = room.gameState;
+                    if (latestState.lastUpdate && latestState.lastUpdate !== gameState.lastUpdate) {
+                        gameState = {...gameState, ...latestState};
+                        updateGameBoard();
+                    }
+                }
+            }, 1000);
+        }
+
+        // Leave room
+        function leaveRoom() {
+            clearInterval(pollingInterval);
+            
+            const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
+            if (rooms[gameState.roomCode]) {
+                rooms[gameState.roomCode].players = rooms[gameState.roomCode].players.filter(
+                    p => p.id !== gameState.myPlayerId
+                );
+                
+                if (rooms[gameState.roomCode].players.length === 0) {
+                    delete rooms[gameState.roomCode];
+                } else if (gameState.isHost) {
+                    // Transfer host to next player
+                    rooms[gameState.roomCode].players[0].isHost = true;
+                    rooms[gameState.roomCode].host = rooms[gameState.roomCode].players[0].id;
+                }
+                
+                localStorage.setItem('unstableRooms', JSON.stringify(rooms));
+            }
+            
+            location.reload();
+        }
+
+        // Start Game
+        function startGame() {
+            if (!gameState.isHost) return;
+            if (gameState.players.length < 2) {
+                alert('Need at least 2 players to start');
+                return;
+            }
+            
+            // Initialize game state
+            initializeGameState();
+            
+            const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
+            rooms[gameState.roomCode].gameStarted = true;
+            rooms[gameState.roomCode].gameState = gameState;
+            localStorage.setItem('unstableRooms', JSON.stringify(rooms));
+            
+            initializeGame();
+        }
+
+        // Initialize game state
+        function initializeGameState() {
+            // Set win condition based on player count
+            gameState.winCondition = gameState.players.length <= 5 ? 7 : 6;
+            
+            // Create and shuffle deck
+            const deck = [];
+            Object.values(cardDefinitions).forEach(category => {
+                if (Array.isArray(category)) {
+                    category.forEach(card => {
+                        if (card.type !== 'baby') {
+                            deck.push({...card});
+                        }
+                    });
+                }
+            });
+            
+            // Shuffle deck
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            
+            gameState.deck = deck;
+            
+            // Initialize player hands and stables
+            gameState.players.forEach((player, index) => {
+                gameState.hands[player.id] = [];
+                gameState.stables[player.id] = [];
+                gameState.upgrades[player.id] = [];
+                gameState.downgrades[player.id] = [];
+                
+                // Give each player a baby unicorn
+                gameState.stables[player.id].push({
+                    ...cardDefinitions.babyUnicorns[index],
+                    owner: player.id
+                });
+                
+                // Deal 5 cards to each player
+                for (let i = 0; i < 5; i++) {
+                    if (gameState.deck.length > 0) {
+                        gameState.hands[player.id].push(gameState.deck.pop());
+                    }
+                }
+            });
+            
+            gameState.currentTurn = 0;
+            gameState.currentPhase = 'beginning';
+            gameState.lastUpdate = Date.now();
+        }
+
+        // Initialize game board
+        function initializeGame() {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game-board').style.display = 'block';
+            
+            document.getElementById('win-condition').textContent = gameState.winCondition;
+            
+            updateGameBoard();
+        }
+
+        // Update game board
+        function updateGameBoard() {
+            // Update turn indicator
+            const currentPlayer = gameState.players[gameState.currentTurn];
+            document.getElementById('turn-indicator').textContent = 
+                `Current Turn: ${currentPlayer.name}`;
+            
+            // Update phase
+            const phaseNames = {
+                'beginning': 'Beginning Phase',
+                'draw': 'Draw Phase',
+                'action': 'Action Phase',
+                'end': 'End Phase'
+            };
+            document.getElementById('phase-indicator').textContent = phaseNames[gameState.currentPhase];
+            document.getElementById('current-phase-info').textContent = phaseNames[gameState.currentPhase];
+            
+            // Update deck count
+            document.getElementById('deck-count').textContent = `${gameState.deck.length} cards`;
+            document.getElementById('discard-count').textContent = `${gameState.discardPile.length} cards`;
+            
+            // Update my hand
+            const myHand = gameState.hands[gameState.myPlayerId] || [];
+            const handContainer = document.getElementById('hand-cards');
+            handContainer.innerHTML = '';
+            
+            myHand.forEach(card => {
+                const cardElement = createCardElement(card);
+                cardElement.onclick = () => selectCard(card);
+                handContainer.appendChild(cardElement);
+            });
+            
+            // Update my stable
+            const myStable = gameState.stables[gameState.myPlayerId] || [];
+            const stableContainer = document.getElementById('my-stable-cards');
+            stableContainer.innerHTML = '';
+            
+            myStable.forEach(card => {
+                const cardElement = createCardElement(card);
+                stableContainer.appendChild(cardElement);
+            });
+            
+            const unicornCount = myStable.filter(c => 
+                c.type === 'unicorn' || c.type === 'baby'
+            ).length;
+            document.getElementById('my-unicorn-count').textContent = unicornCount;
+            
+            // Update upgrades/downgrades
+            const myUpgrades = gameState.upgrades[gameState.myPlayerId] || [];
+            const myDowngrades = gameState.downgrades[gameState.myPlayerId] || [];
+            
+            myUpgrades.forEach(card => {
+                const cardElement = createCardElement(card);
+                stableContainer.appendChild(cardElement);
+            });
+            
+            myDowngrades.forEach(card => {
+                const cardElement = createCardElement(card);
+                stableContainer.appendChild(cardElement);
+            });
+            
+            // Update opponents area
+            const opponentsArea = document.getElementById('opponents-area');
+            opponentsArea.innerHTML = '';
+            
+            gameState.players.forEach(player => {
+                if (player.id !== gameState.myPlayerId) {
+                    const opponentDiv = document.createElement('div');
+                    opponentDiv.className = 'opponent-stable';
+                    
+                    const stable = gameState.stables[player.id] || [];
+                    const unicornCount = stable.filter(c => 
+                        c.type === 'unicorn' || c.type === 'baby'
+                    ).length;
+                    
+                    opponentDiv.innerHTML = `
+                        <div class="stable-header">${player.name}'s Stable (${unicornCount} Unicorns)</div>
+                        <div class="stable-cards" id="opponent-${player.id}-stable"></div>
+                    `;
+                    
+                    opponentsArea.appendChild(opponentDiv);
+                    
+                    const opponentStableContainer = document.getElementById(`opponent-${player.id}-stable`);
+                    stable.forEach(card => {
+                        const cardElement = createCardElement(card);
+                        opponentStableContainer.appendChild(cardElement);
+                    });
+                    
+                    // Add upgrades/downgrades
+                    const upgrades = gameState.upgrades[player.id] || [];
+                    const downgrades = gameState.downgrades[player.id] || [];
+                    
+                    upgrades.forEach(card => {
+                        const cardElement = createCardElement(card);
+                        opponentStableContainer.appendChild(cardElement);
+                    });
+                    
+                    downgrades.forEach(card => {
+                        const cardElement = createCardElement(card);
+                        opponentStableContainer.appendChild(cardElement);
+                    });
+                }
+            });
+            
+            // Update actions remaining
+            document.getElementById('actions-remaining').textContent = 
+                `${gameState.actionsRemaining} remaining`;
+            
+            // Check for winner
+            checkWinCondition();
+        }
+
+        // Create card element
+        function createCardElement(card) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = `card ${card.type}`;
+            if (gameState.selectedCard && gameState.selectedCard.id === card.id) {
+                cardDiv.className += ' selected';
+            }
+            
+            cardDiv.innerHTML = `
+                <div class="card-type">${card.type}</div>
+                <div class="card-name">${card.name}</div>
+                <div class="card-description">${card.description}</div>
+            `;
+            
+            return cardDiv;
+        }
+
+        // Select card
+        function selectCard(card) {
+            const currentPlayer = gameState.players[gameState.currentTurn];
+            if (currentPlayer.id !== gameState.myPlayerId) {
+                addGameLog("It's not your turn!");
+                return;
+            }
+            
+            if (gameState.currentPhase !== 'action') {
+                addGameLog("You can only play cards during the action phase!");
+                return;
+            }
+            
+            gameState.selectedCard = card;
+            updateGameBoard();
+        }
+
+        // Play selected card
+        function playSelectedCard() {
+            if (!gameState.selectedCard) {
+                addGameLog("No card selected!");
+                return;
+            }
+            
+            const currentPlayer = gameState.players[gameState.currentTurn];
+            if (currentPlayer.id !== gameState.myPlayerId) {
+                addGameLog("It's not your turn!");
+                return;
+            }
+            
+            if (gameState.currentPhase !== 'action') {
+                addGameLog("You can only play cards during the action phase!");
+                return;
+            }
+            
+            if (gameState.actionsRemaining <= 0) {
+                addGameLog("No actions remaining!");
+                return;
+            }
+            
+            const card = gameState.selectedCard;
+            
+            // Check for downgrades that might prevent playing
+            const myDowngrades = gameState.downgrades[gameState.myPlayerId] || [];
+            for (let downgrade of myDowngrades) {
+                if (downgrade.effect === 'noUpgrades' && card.type === 'upgrade') {
+                    addGameLog("Barbed Wire prevents you from playing upgrades!");
+                    return;
+                }
+                if (downgrade.effect === 'tinyStable' && 
+                    (card.type === 'unicorn' || card.type === 'baby')) {
+                    const unicornCount = gameState.stables[gameState.myPlayerId].filter(
+                        c => c.type === 'unicorn' || c.type === 'baby'
+                    ).length;
+                    if (unicornCount >= 4) {
+                        addGameLog("Tiny Stable prevents you from playing more unicorns!");
+                        return;
+                    }
+                }
+            }
+            
+            // Play the card based on type
+            switch(card.type) {
+                case 'unicorn':
+                case 'baby':
+                    playUnicorn(card);
+                    break;
+                case 'magic':
+                    playMagicCard(card);
+                    break;
+                case 'instant':
+                    addGameLog("Instant cards can only be played in response to other cards!");
+                    return;
+                case 'upgrade':
+                    playUpgrade(card);
+                    break;
+                case 'downgrade':
+                    playDowngrade(card);
+                    break;
+            }
+            
+            gameState.selectedCard = null;
+            gameState.actionsRemaining--;
+            
+            // Remove card from hand
+            const hand = gameState.hands[gameState.myPlayerId];
+            const index = hand.findIndex(c => c.id === card.id);
+            if (index > -1) {
+                hand.splice(index, 1);
+            }
+            
+            syncGameState();
+            updateGameBoard();
+        }
+
+        // Play unicorn card
+        function playUnicorn(card) {
+            gameState.stables[gameState.myPlayerId].push(card);
+            addGameLog(`${gameState.currentPlayer.name} played ${card.name}`);
+            
+            // Handle enter effects
+            if (card.effect === 'onEnter') {
+                handleUnicornEffect(card);
+            }
+        }
+
+        // Play magic card
+        function playMagicCard(card) {
+            addGameLog(`${gameState.currentPlayer.name} played ${card.name}`);
+            
+            switch(card.effect) {
+                case 'destroy':
+                    selectTargetUnicorn('destroy');
+                    break;
+                case 'return':
+                    selectTargetUnicorn('return');
+                    break;
+                case 'draw':
+                    // Draw 2 cards
+                    for (let i = 0; i < 2; i++) {
+                        if (gameState.deck.length > 0) {
+                            gameState.hands[gameState.myPlayerId].push(gameState.deck.pop());
+                        }
+                    }
+                    // TODO: Force discard 3 cards
+                    break;
+                case 'swap':
+                    // TODO: Implement swap
+                    break;
+                default:
+                    break;
+            }
+            
+            gameState.discardPile.push(card);
+        }
+
+        // Play upgrade card
+        function playUpgrade(card) {
+            gameState.upgrades[gameState.myPlayerId].push(card);
+            addGameLog(`${gameState.currentPlayer.name} played upgrade: ${card.name}`);
+            
+            // Apply upgrade effects
+            if (card.effect === 'doubleAction') {
+                gameState.actionsRemaining++;
+            }
+        }
+
+        // Play downgrade card
+        function playDowngrade(card) {
+            // Select target player
+            selectTargetPlayer((targetId) => {
+                gameState.downgrades[targetId].push(card);
+                addGameLog(`${gameState.currentPlayer.name} gave ${card.name} to opponent`);
+            });
+        }
+
+        // Select target unicorn
+        function selectTargetUnicorn(action) {
+            const allUnicorns = [];
+            
+            Object.keys(gameState.stables).forEach(playerId => {
+                gameState.stables[playerId].forEach(unicorn => {
+                    if (unicorn.type === 'unicorn' || unicorn.type === 'baby') {
+                        allUnicorns.push({
+                            ...unicorn,
+                            ownerId: playerId,
+                            ownerName: gameState.players.find(p => p.id === playerId).name
+                        });
+                    }
+                });
+            });
+            
+            if (allUnicorns.length === 0) {
+                addGameLog("No unicorns to target!");
+                return;
+            }
+            
+            // Show target modal
+            const modal = document.getElementById('target-modal');
+            const targetList = document.getElementById('target-list');
+            targetList.innerHTML = '';
+            
+            allUnicorns.forEach(unicorn => {
+                const option = document.createElement('div');
+                option.className = 'target-option';
+                option.textContent = `${unicorn.ownerName}'s ${unicorn.name}`;
+                option.onclick = () => {
+                    if (action === 'destroy') {
+                        destroyUnicorn(unicorn.ownerId, unicorn.id);
+                    } else if (action === 'return') {
+                        returnUnicorn(unicorn.ownerId, unicorn.id);
+                    }
+                    closeTargetModal();
+                };
+                targetList.appendChild(option);
+            });
+            
+            modal.style.display = 'flex';
+        }
+
+        // Select target player
+        function selectTargetPlayer(callback) {
+            const modal = document.getElementById('target-modal');
+            const targetList = document.getElementById('target-list');
+            targetList.innerHTML = '';
+            
+            gameState.players.forEach(player => {
+                if (player.id !== gameState.myPlayerId) {
+                    const option = document.createElement('div');
+                    option.className = 'target-option';
+                    option.textContent = player.name;
+                    option.onclick = () => {
+                        callback(player.id);
+                        closeTargetModal();
+                        syncGameState();
+                        updateGameBoard();
+                    };
+                    targetList.appendChild(option);
+                }
+            });
+            
+            modal.style.display = 'flex';
+        }
+
+        // Close target modal
+        function closeTargetModal() {
+            document.getElementById('target-modal').style.display = 'none';
+        }
+
+        // Destroy unicorn
+        function destroyUnicorn(ownerId, unicornId) {
+            const stable = gameState.stables[ownerId];
+            const index = stable.findIndex(c => c.id === unicornId);
+            if (index > -1) {
+                const destroyed = stable.splice(index, 1)[0];
+                gameState.discardPile.push(destroyed);
+                addGameLog(`Destroyed ${destroyed.name}`);
+            }
+            syncGameState();
+            updateGameBoard();
+        }
+
+        // Return unicorn to hand
+        function returnUnicorn(ownerId, unicornId) {
+            const stable = gameState.stables[ownerId];
+            const index = stable.findIndex(c => c.id === unicornId);
+            if (index > -1) {
+                const returned = stable.splice(index, 1)[0];
+                gameState.hands[ownerId].push(returned);
+                addGameLog(`Returned ${returned.name} to hand`);
+            }
+            syncGameState();
+            updateGameBoard();
+        }
+
+        // Handle unicorn effects
+        function handleUnicornEffect(card) {
+            switch(card.name) {
+                case 'Rainbow Unicorn':
+                    // Bring a basic unicorn from hand to stable
+                    const basicInHand = gameState.hands[gameState.myPlayerId].find(
+                        c => c.name === 'Basic Unicorn'
+                    );
+                    if (basicInHand) {
+                        playUnicorn(basicInHand);
+                    }
+                    break;
+                case 'Puppicorn':
+                    // Draw a card
+                    if (gameState.deck.length > 0) {
+                        gameState.hands[gameState.myPlayerId].push(gameState.deck.pop());
+                        addGameLog("Drew a card from Puppicorn's effect");
+                    }
+                    break;
+                case 'Rhinocorn':
+                    selectTargetUnicorn('destroy');
+                    break;
+                case 'Stabby Unicorn':
+                    // TODO: Destroy upgrade/downgrade
+                    break;
+                case 'Extremely Destructive Unicorn':
+                    // Each player sacrifices a unicorn
+                    addGameLog("Each player must sacrifice a unicorn!");
+                    // TODO: Implement sacrifice selection
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Draw card
+        function drawCard() {
+            const currentPlayer = gameState.players[gameState.currentTurn];
+            if (currentPlayer.id !== gameState.myPlayerId) {
+                addGameLog("It's not your turn!");
+                return;
+            }
+            
+            if (gameState.currentPhase !== 'draw') {
+                addGameLog("You can only draw during the draw phase!");
+                return;
+            }
+            
+            if (gameState.drawnThisTurn) {
+                addGameLog("You've already drawn this turn!");
+                return;
+            }
+            
+            if (gameState.deck.length === 0) {
+                // Shuffle discard pile back into deck
+                gameState.deck = [...gameState.discardPile];
+                gameState.discardPile = [];
+                // Shuffle
+                for (let i = gameState.deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [gameState.deck[i], gameState.deck[j]] = [gameState.deck[j], gameState.deck[i]];
+                }
+            }
+            
+            if (gameState.deck.length > 0) {
+                const card = gameState.deck.pop();
+                gameState.hands[gameState.myPlayerId].push(card);
+                gameState.drawnThisTurn = true;
+                addGameLog("Drew a card");
+                
+                // Auto-advance to action phase
+                gameState.currentPhase = 'action';
+                
+                syncGameState();
+                updateGameBoard();
+            }
+        }
+
+        // End turn
+        function endTurn() {
+            const currentPlayer = gameState.players[gameState.currentTurn];
+            if (currentPlayer.id !== gameState.myPlayerId) {
+                addGameLog("It's not your turn!");
+                return;
+            }
+            
+            // Check hand limit (7 cards max)
+            const hand = gameState.hands[gameState.myPlayerId];
+            if (hand.length > 7) {
+                addGameLog(`You must discard ${hand.length - 7} cards!`);
+                // TODO: Implement discard selection
+                return;
+            }
+            
+            // Move to next player
+            gameState.currentTurn = (gameState.currentTurn + 1) % gameState.players.length;
+            gameState.currentPhase = 'beginning';
+            gameState.actionsRemaining = 1;
+            gameState.drawnThisTurn = false;
+            
+            // Check for Double Dutch upgrade
+            const nextPlayerId = gameState.players[gameState.currentTurn].id;
+            const upgrades = gameState.upgrades[nextPlayerId] || [];
+            if (upgrades.find(u => u.effect === 'doubleAction')) {
+                gameState.actionsRemaining = 2;
+            }
+            
+            addGameLog(`${currentPlayer.name} ended their turn`);
+            
+            // Auto-advance to draw phase for next player
+            setTimeout(() => {
+                gameState.currentPhase = 'draw';
+                syncGameState();
+                updateGameBoard();
+            }, 1000);
+            
+            syncGameState();
+            updateGameBoard();
+        }
+
+        // Add game log entry
+        function addGameLog(message) {
+            const logContainer = document.getElementById('game-log-entries');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = message;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // Check win condition
+        function checkWinCondition() {
+            for (let player of gameState.players) {
+                const stable = gameState.stables[player.id] || [];
+                const unicornCount = stable.filter(c => 
+                    c.type === 'unicorn' || c.type === 'baby'
+                ).length;
+                
+                // Check for Americorn
+                const hasAmericorn = stable.find(c => c.name === 'Americorn');
+                const effectiveCount = hasAmericorn ? unicornCount * 2 : unicornCount;
+                
+                if (effectiveCount >= gameState.winCondition) {
+                    showWinner(player);
+                    return;
+                }
+            }
+        }
+
+        // Show winner
+        function showWinner(player) {
+            const winDiv = document.createElement('div');
+            winDiv.className = 'win-screen';
+            winDiv.innerHTML = `
+                <h1>🦄 Victory! 🦄</h1>
+                <h2>${player.name} wins!</h2>
+                <p>Congratulations on collecting ${gameState.winCondition} unicorns!</p>
+                <button onclick="location.reload()">Play Again</button>
+            `;
+            document.body.appendChild(winDiv);
+            
+            clearInterval(pollingInterval);
+        }
+
+        // Sync game state to localStorage
+        function syncGameState() {
+            gameState.lastUpdate = Date.now();
+            const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
+            if (rooms[gameState.roomCode]) {
+                rooms[gameState.roomCode].gameState = gameState;
+                localStorage.setItem('unstableRooms', JSON.stringify(rooms));
+            }
+        }
+
+        // Initialize
+        initLocalMultiplayer();
+    </script>
+</body>
+</html>
