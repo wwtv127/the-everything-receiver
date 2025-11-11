@@ -59,7 +59,7 @@
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
@@ -67,6 +67,7 @@
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none !important;
         }
 
         input[type="text"] {
@@ -128,6 +129,11 @@
             font-size: 0.8em;
         }
 
+        .player-item.current {
+            background: #d1f2eb;
+            font-weight: bold;
+        }
+
         /* Game Board Styles */
         .game-board {
             display: none;
@@ -145,6 +151,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .turn-indicator {
@@ -156,6 +164,18 @@
             background: rgba(255, 255, 255, 0.2);
             padding: 5px 15px;
             border-radius: 5px;
+        }
+
+        .my-turn-indicator {
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .not-my-turn {
+            background: #dc3545;
         }
 
         .game-area {
@@ -183,6 +203,15 @@
 
         .deck:hover {
             transform: scale(1.05);
+        }
+
+        .deck.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .deck.disabled:hover {
+            transform: none;
         }
 
         .discard-pile {
@@ -214,6 +243,10 @@
             flex: 1;
         }
 
+        .opponent-stable.current-player {
+            border: 3px solid #28a745;
+        }
+
         .stable-header {
             font-weight: bold;
             margin-bottom: 10px;
@@ -225,6 +258,10 @@
             border-radius: 10px;
             padding: 20px;
             min-height: 200px;
+        }
+
+        .my-stable.current-player {
+            border: 3px solid #28a745;
         }
 
         .my-hand {
@@ -261,6 +298,7 @@
 
         .card.selected {
             border-color: #28a745;
+            border-width: 3px;
             box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
         }
 
@@ -293,9 +331,19 @@
             color: white;
         }
 
+        .card.magic .card-type,
+        .card.magic .card-description {
+            color: #ddd;
+        }
+
         .card.instant {
             background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
             color: white;
+        }
+
+        .card.instant .card-type,
+        .card.instant .card-description {
+            color: #ddd;
         }
 
         .card.upgrade {
@@ -323,6 +371,10 @@
             right: 20px;
             display: flex;
             gap: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
 
         .action-button {
@@ -390,6 +442,11 @@
             font-size: 0.9em;
         }
 
+        .log-entry.error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
         .win-screen {
             position: fixed;
             top: 50%;
@@ -409,6 +466,16 @@
             margin-bottom: 20px;
         }
 
+        .status-message {
+            background: #ffc107;
+            color: #000;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+
         @media (max-width: 768px) {
             .game-area {
                 grid-template-columns: 1fr;
@@ -417,6 +484,13 @@
             .card {
                 width: 100px;
                 min-height: 140px;
+            }
+            
+            .action-buttons {
+                bottom: 10px;
+                right: 10px;
+                left: 10px;
+                justify-content: center;
             }
         }
     </style>
@@ -465,12 +539,13 @@
             <div class="game-header">
                 <div class="turn-indicator" id="turn-indicator">Current Turn: Player 1</div>
                 <div class="phase-indicator" id="phase-indicator">Beginning Phase</div>
+                <div class="my-turn-indicator" id="my-turn-indicator">NOT YOUR TURN</div>
                 <div>Unicorns to Win: <span id="win-condition">7</span></div>
             </div>
 
             <div class="game-area">
                 <div class="deck-area">
-                    <div class="deck" onclick="drawCard()">
+                    <div class="deck" id="draw-deck" onclick="drawCard()">
                         <div>Draw Deck</div>
                         <div id="deck-count">0 cards</div>
                     </div>
@@ -489,13 +564,13 @@
                         <!-- Opponent stables will be dynamically added here -->
                     </div>
 
-                    <div class="my-stable">
+                    <div class="my-stable" id="my-stable-area">
                         <div class="stable-header">My Stable (<span id="my-unicorn-count">0</span> Unicorns)</div>
                         <div class="stable-cards" id="my-stable-cards"></div>
                     </div>
 
                     <div class="my-hand">
-                        <div class="stable-header">My Hand</div>
+                        <div class="stable-header">My Hand (<span id="hand-count">0</span> cards)</div>
                         <div class="hand-cards" id="hand-cards"></div>
                     </div>
                 </div>
@@ -503,7 +578,9 @@
                 <div class="deck-area">
                     <h3>Game Info</h3>
                     <div style="margin-top: 10px; font-size: 0.9em;">
-                        <p><strong>Phase:</strong></p>
+                        <p><strong>Turn Order:</strong></p>
+                        <div id="turn-order"></div>
+                        <p style="margin-top: 10px;"><strong>Phase:</strong></p>
                         <p id="current-phase-info">Beginning</p>
                         <p style="margin-top: 10px;"><strong>Actions:</strong></p>
                         <p id="actions-remaining">1 remaining</p>
@@ -512,15 +589,16 @@
             </div>
 
             <div class="action-buttons">
-                <button class="action-button" onclick="playSelectedCard()">Play Card</button>
-                <button class="action-button" onclick="endTurn()">End Turn</button>
+                <button class="action-button" id="play-card-btn" onclick="playSelectedCard()">Play Card</button>
+                <button class="action-button" id="skip-phase-btn" onclick="skipPhase()">Skip Phase</button>
+                <button class="action-button" id="end-turn-btn" onclick="endTurn()">End Turn</button>
             </div>
         </div>
 
         <!-- Target Selection Modal -->
         <div id="target-modal" class="modal">
             <div class="modal-content">
-                <h2>Select Target</h2>
+                <h2 id="modal-title">Select Target</h2>
                 <div id="target-list" class="target-list"></div>
                 <button onclick="closeTargetModal()" style="margin-top: 20px;">Cancel</button>
             </div>
@@ -536,8 +614,8 @@
             isHost: false,
             myPlayerId: null,
             gameStarted: false,
-            currentTurn: 0,
-            currentPhase: 'beginning', // beginning, draw, action, end
+            currentTurnIndex: 0,
+            currentPhase: 'beginning',
             deck: [],
             discardPile: [],
             hands: {},
@@ -546,8 +624,10 @@
             downgrades: {},
             selectedCard: null,
             actionsRemaining: 1,
-            drawnThisTurn: false,
-            winCondition: 7
+            hasDrawn: false,
+            hasPlayedThisTurn: false,
+            winCondition: 7,
+            turnNumber: 0
         };
 
         // Card Definitions
@@ -560,65 +640,91 @@
                 {id: 'baby5', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
                 {id: 'baby6', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
                 {id: 'baby7', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
-                {id: 'baby8', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'}
+                {id: 'baby8', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby9', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby10', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby11', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'},
+                {id: 'baby12', type: 'baby', name: 'Baby Unicorn', description: 'Basic baby unicorn'}
             ],
             basicUnicorns: [
-                {id: 'basic1', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic2', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic3', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic4', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic5', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic6', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic7', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic8', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic9', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'},
-                {id: 'basic10', type: 'unicorn', name: 'Basic Unicorn', description: 'Just a regular unicorn'}
+                {id: 'basic1', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic2', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic3', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic4', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic5', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic6', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic7', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic8', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic9', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic10', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic11', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic12', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic13', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic14', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'},
+                {id: 'basic15', type: 'unicorn', name: 'Basic Unicorn', description: 'Boring. Ordinary.'}
             ],
             magicalUnicorns: [
-                {id: 'magical1', type: 'unicorn', name: 'Rainbow Unicorn', description: 'When this enters your stable, bring a Basic Unicorn from your hand to your stable', effect: 'onEnter'},
-                {id: 'magical2', type: 'unicorn', name: 'Extremely Destructive Unicorn', description: 'When this enters your stable, each player must sacrifice a unicorn', effect: 'onEnter'},
-                {id: 'magical3', type: 'unicorn', name: 'Unicorn Phoenix', description: 'If this is sacrificed or destroyed, bring it back to your stable at the end of turn', effect: 'persistent'},
-                {id: 'magical4', type: 'unicorn', name: 'Magical Kittencorn', description: 'This cannot be destroyed by magic cards', effect: 'persistent'},
-                {id: 'magical5', type: 'unicorn', name: 'Stabby Unicorn', description: 'When this enters your stable, destroy an upgrade or downgrade', effect: 'onEnter'},
-                {id: 'magical6', type: 'unicorn', name: 'Puppicorn', description: 'When this enters your stable, draw a card', effect: 'onEnter'},
-                {id: 'magical7', type: 'unicorn', name: 'Rhinocorn', description: 'When this enters your stable, destroy a unicorn', effect: 'onEnter'},
-                {id: 'magical8', type: 'unicorn', name: 'Extremely Fertile Unicorn', description: 'When you play a unicorn, immediately play another from hand', effect: 'persistent'},
-                {id: 'magical9', type: 'unicorn', name: 'Llamacorn', description: 'When this enters play, each player must discard a card', effect: 'onEnter'},
-                {id: 'magical10', type: 'unicorn', name: 'Americorn', description: 'All your unicorns count as 2 unicorns', effect: 'persistent'}
+                {id: 'magical1', type: 'unicorn', name: 'Rainbow Unicorn', description: 'When this enters your stable, bring a Basic Unicorn from your hand directly into your stable.', effect: 'onEnter'},
+                {id: 'magical2', type: 'unicorn', name: 'Zombie Unicorn', description: 'If this is in your stable when any unicorn is destroyed, you may return it to your hand instead.', effect: 'persistent'},
+                {id: 'magical3', type: 'unicorn', name: 'Extremely Destructive Unicorn', description: 'When this enters your stable, each player must SACRIFICE a unicorn.', effect: 'onEnter'},
+                {id: 'magical4', type: 'unicorn', name: 'Magical Kittencorn', description: 'This card cannot be destroyed by magic cards.', effect: 'persistent'},
+                {id: 'magical5', type: 'unicorn', name: 'Stabby Unicorn', description: 'When this enters your stable, you may destroy an upgrade or downgrade.', effect: 'onEnter'},
+                {id: 'magical6', type: 'unicorn', name: 'Puppicorn', description: 'When this enters your stable, draw a card.', effect: 'onEnter'},
+                {id: 'magical7', type: 'unicorn', name: 'Rhinocorn', description: 'When this enters your stable, you may destroy a unicorn.', effect: 'onEnter'},
+                {id: 'magical8', type: 'unicorn', name: 'Extremely Fertile Unicorn', description: 'If this is in your stable at the beginning of your turn, you may discard a card to bring a baby unicorn from the nursery into your stable.', effect: 'beginningOfTurn'},
+                {id: 'magical9', type: 'unicorn', name: 'Llamacorn', description: 'When this enters your stable, each player must DISCARD a card.', effect: 'onEnter'},
+                {id: 'magical10', type: 'unicorn', name: 'Americorn', description: 'All your unicorns count as 2 unicorns.', effect: 'persistent'},
+                {id: 'magical11', type: 'unicorn', name: 'Ginormous Unicorn', description: 'This counts as 2 unicorns. You cannot play any Instant cards.', effect: 'persistent'},
+                {id: 'magical12', type: 'unicorn', name: 'Seductive Unicorn', description: 'When this enters your stable, STEAL a unicorn. Return it at the end of your turn.', effect: 'onEnter'},
+                {id: 'magical13', type: 'unicorn', name: 'Angel Unicorn', description: 'If this is in your stable when a unicorn is destroyed, you may DRAW a card.', effect: 'persistent'},
+                {id: 'magical14', type: 'unicorn', name: 'Queen Bee Unicorn', description: 'Basic unicorns cannot enter any stable.', effect: 'persistent'},
+                {id: 'magical15', type: 'unicorn', name: 'Greedy Flying Unicorn', description: 'When this enters your stable, DRAW a card. If this is sacrificed or destroyed, return it to your hand.', effect: 'onEnter'}
             ],
             magicCards: [
-                {id: 'magic1', type: 'magic', name: 'Unicorn Poison', description: 'Destroy a unicorn', effect: 'destroy'},
-                {id: 'magic2', type: 'magic', name: 'Back Kick', description: 'Return a unicorn to its owner\'s hand', effect: 'return'},
-                {id: 'magic3', type: 'magic', name: 'Change of Luck', description: 'Draw 2 cards and discard 3 cards', effect: 'draw'},
-                {id: 'magic4', type: 'magic', name: 'Glitter Tornado', description: 'Return all cards in hand to deck, shuffle, draw same amount', effect: 'shuffle'},
-                {id: 'magic5', type: 'magic', name: 'Unicorn Swap', description: 'Swap a unicorn in your stable with one in another stable', effect: 'swap'},
-                {id: 'magic6', type: 'magic', name: 'Re-Target', description: 'Move an upgrade or downgrade to another player', effect: 'move'},
-                {id: 'magic7', type: 'magic', name: 'Unfair Bargain', description: 'Trade a card in hand with a random card from another player', effect: 'trade'},
-                {id: 'magic8', type: 'magic', name: 'Two-For-One', description: 'Sacrifice a unicorn, then destroy 2 unicorns', effect: 'sacrifice'},
-                {id: 'magic9', type: 'magic', name: 'Unicorn Shrinkray', description: 'Choose a player. Their unicorns count as baby unicorns until your next turn', effect: 'shrink'},
-                {id: 'magic10', type: 'magic', name: 'Targeted Destruction', description: 'Destroy an upgrade or downgrade', effect: 'destroyUpgrade'}
+                {id: 'magic1', type: 'magic', name: 'Unicorn Poison', description: 'DESTROY a unicorn.', effect: 'destroy'},
+                {id: 'magic2', type: 'magic', name: 'Back Kick', description: 'Return a unicorn to its owner\'s hand.', effect: 'return'},
+                {id: 'magic3', type: 'magic', name: 'Change of Luck', description: 'DRAW 2 cards and DISCARD 3 cards.', effect: 'draw'},
+                {id: 'magic4', type: 'magic', name: 'Glitter Tornado', description: 'Return all cards in YOUR hand to the deck. Shuffle. DRAW the same number of cards.', effect: 'shuffle'},
+                {id: 'magic5', type: 'magic', name: 'Unicorn Swap', description: 'Move a unicorn in your stable to any other stable. Move a unicorn from that stable to your stable.', effect: 'swap'},
+                {id: 'magic6', type: 'magic', name: 'Re-Target', description: 'Move an Upgrade or Downgrade from one player to another.', effect: 'move'},
+                {id: 'magic7', type: 'magic', name: 'Unfair Bargain', description: 'Trade hands with another player.', effect: 'trade'},
+                {id: 'magic8', type: 'magic', name: 'Two-For-One', description: 'SACRIFICE a unicorn. DESTROY 2 unicorns.', effect: 'sacrifice'},
+                {id: 'magic9', type: 'magic', name: 'Unicorn Shrinkray', description: 'Choose any player. Unicorns in that player\'s stable count as baby unicorns until your next turn.', effect: 'shrink'},
+                {id: 'magic10', type: 'magic', name: 'Targeted Destruction', description: 'DESTROY an Upgrade or Downgrade.', effect: 'destroyUpgrade'},
+                {id: 'magic11', type: 'magic', name: 'Mystical Vortex', description: 'Shuffle EVERYONE\'s hand into the deck. Each player DRAWS 3 cards.', effect: 'vortex'},
+                {id: 'magic12', type: 'magic', name: 'Good Deal', description: 'DRAW 3 cards and DISCARD 1 card.', effect: 'goodDeal'},
+                {id: 'magic13', type: 'magic', name: 'Shake Up', description: 'Shuffle your hand into the deck. DRAW 5 cards.', effect: 'shakeUp'},
+                {id: 'magic14', type: 'magic', name: 'Blatant Thievery', description: 'Look at another player\'s hand. Choose a card and add it to your hand.', effect: 'steal'}
             ],
             instantCards: [
-                {id: 'instant1', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
-                {id: 'instant2', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
-                {id: 'instant3', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
-                {id: 'instant4', type: 'instant', name: 'Neigh', description: 'Stop any player from playing a card', effect: 'counter'},
-                {id: 'instant5', type: 'instant', name: 'Super Neigh', description: 'Stop any card that cannot be Neighed', effect: 'superCounter'},
-                {id: 'instant6', type: 'instant', name: 'Yay', description: 'Play immediately when someone plays a unicorn. Steal that unicorn', effect: 'steal'}
+                {id: 'instant1', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant2', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant3', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant4', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant5', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant6', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant7', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant8', type: 'instant', name: 'Neigh', description: 'Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'counter'},
+                {id: 'instant9', type: 'instant', name: 'Super Neigh', description: 'This cannot be Neighed. Play when any player plays a card. Stop that card and send it to the discard pile.', effect: 'superCounter'},
+                {id: 'instant10', type: 'instant', name: 'Yay', description: 'Play when another player tries to play a card. That card is brought into YOUR stable instead.', effect: 'steal'}
             ],
             upgradeCards: [
-                {id: 'upgrade1', type: 'upgrade', name: 'Double Dutch', description: 'Play 2 cards in action phase', effect: 'doubleAction'},
-                {id: 'upgrade2', type: 'upgrade', name: 'Glitter Bomb', description: 'When you play a unicorn, destroy a card', effect: 'destroyOnPlay'},
-                {id: 'upgrade3', type: 'upgrade', name: 'Rainbow Aura', description: 'Your unicorns cannot be destroyed', effect: 'protection'},
-                {id: 'upgrade4', type: 'upgrade', name: 'Summoning Ritual', description: 'Draw an extra card each turn', effect: 'extraDraw'},
-                {id: 'upgrade5', type: 'upgrade', name: 'Unicorn Lasso', description: 'When you play an upgrade, steal a unicorn until end of turn', effect: 'steal'}
+                {id: 'upgrade1', type: 'upgrade', name: 'Double Dutch', description: 'You may play 2 cards during your Action phase.', effect: 'doubleAction'},
+                {id: 'upgrade2', type: 'upgrade', name: 'Glitter Bomb', description: 'When you play a unicorn, you may DESTROY a card.', effect: 'destroyOnPlay'},
+                {id: 'upgrade3', type: 'upgrade', name: 'Rainbow Aura', description: 'Your unicorns cannot be destroyed.', effect: 'protection'},
+                {id: 'upgrade4', type: 'upgrade', name: 'Summoning Ritual', description: 'You may DRAW an extra card during your Draw phase.', effect: 'extraDraw'},
+                {id: 'upgrade5', type: 'upgrade', name: 'Unicorn Lasso', description: 'When you play an Upgrade, you may STEAL a unicorn until end of turn.', effect: 'steal'},
+                {id: 'upgrade6', type: 'upgrade', name: 'Extra Tail', description: 'You may DRAW an extra card when you play a unicorn.', effect: 'drawOnUnicorn'},
+                {id: 'upgrade7', type: 'upgrade', name: 'Caffeine Overload', description: 'Your hand limit is 10 cards.', effect: 'handLimit'}
             ],
             downgradeCards: [
-                {id: 'downgrade1', type: 'downgrade', name: 'Barbed Wire', description: 'You cannot play upgrade cards', effect: 'noUpgrades'},
-                {id: 'downgrade2', type: 'downgrade', name: 'Broken Stable', description: 'You can only have 5 unicorns max', effect: 'limitUnicorns'},
-                {id: 'downgrade3', type: 'downgrade', name: 'Blinding Light', description: 'All your unicorns are basic unicorns', effect: 'makeBasic'},
-                {id: 'downgrade4', type: 'downgrade', name: 'Tiny Stable', description: 'You cannot play unicorns if you have 4 or more', effect: 'tinyStable'},
-                {id: 'downgrade5', type: 'downgrade', name: 'Slowdown', description: 'You can only play one card every other turn', effect: 'slowdown'}
+                {id: 'downgrade1', type: 'downgrade', name: 'Barbed Wire', description: 'You cannot play Upgrade cards.', effect: 'noUpgrades'},
+                {id: 'downgrade2', type: 'downgrade', name: 'Broken Stable', description: 'You cannot have more than 5 unicorns in your stable.', effect: 'limitUnicorns'},
+                {id: 'downgrade3', type: 'downgrade', name: 'Blinding Light', description: 'Your unicorn cards count as Basic Unicorns.', effect: 'makeBasic'},
+                {id: 'downgrade4', type: 'downgrade', name: 'Tiny Stable', description: 'If you have 4 or more unicorns in your stable, you cannot play unicorns.', effect: 'tinyStable'},
+                {id: 'downgrade5', type: 'downgrade', name: 'Slowdown', description: 'You cannot play Instant cards.', effect: 'noInstant'},
+                {id: 'downgrade6', type: 'downgrade', name: 'Nanny Cam', description: 'Your hand is visible to all players.', effect: 'visibleHand'},
+                {id: 'downgrade7', type: 'downgrade', name: 'Sadistic Ritual', description: 'At the beginning of your turn, SACRIFICE a unicorn. Draw a card.', effect: 'sacrifice'}
             ]
         };
 
@@ -640,7 +746,7 @@
             if (!playerName) return;
 
             const roomCode = generateRoomCode();
-            const playerId = Date.now().toString();
+            const playerId = 'player_' + Date.now().toString();
             
             gameState.roomCode = roomCode;
             gameState.isHost = true;
@@ -698,7 +804,7 @@
                 return;
             }
             
-            const playerId = Date.now().toString();
+            const playerId = 'player_' + Date.now().toString();
             const newPlayer = {
                 id: playerId,
                 name: playerName,
@@ -752,13 +858,20 @@
             players.forEach(player => {
                 const playerDiv = document.createElement('div');
                 playerDiv.className = 'player-item' + (player.isHost ? ' host' : '');
-                playerDiv.textContent = player.name;
+                if (player.id === gameState.myPlayerId) {
+                    playerDiv.className += ' current';
+                }
+                playerDiv.textContent = player.name + (player.id === gameState.myPlayerId ? ' (You)' : '');
                 listElement.appendChild(playerDiv);
             });
             
             // Enable start button if enough players
-            if (gameState.isHost && players.length >= 2) {
-                document.getElementById('start-game-btn').disabled = false;
+            if (gameState.isHost) {
+                const startBtn = document.getElementById('start-game-btn');
+                startBtn.disabled = players.length < 2;
+                startBtn.textContent = players.length < 2 ? 
+                    'Waiting for players...' : 
+                    `Start Game (${players.length} players)`;
             }
         }
 
@@ -783,7 +896,8 @@
                 
                 // Check if game started
                 if (room.gameStarted && !gameState.gameStarted) {
-                    gameState = {...gameState, ...room.gameState};
+                    gameState = {...room.gameState};
+                    gameState.myPlayerId = gameState.myPlayerId || room.gameState.myPlayerId;
                     gameState.gameStarted = true;
                     initializeGame();
                 }
@@ -792,11 +906,15 @@
                 if (room.gameStarted && room.gameState) {
                     const latestState = room.gameState;
                     if (latestState.lastUpdate && latestState.lastUpdate !== gameState.lastUpdate) {
-                        gameState = {...gameState, ...latestState};
+                        const myId = gameState.myPlayerId;
+                        const isMyHost = gameState.isHost;
+                        gameState = {...latestState};
+                        gameState.myPlayerId = myId;
+                        gameState.isHost = isMyHost;
                         updateGameBoard();
                     }
                 }
-            }, 1000);
+            }, 500);
         }
 
         // Leave room
@@ -839,6 +957,7 @@
             rooms[gameState.roomCode].gameState = gameState;
             localStorage.setItem('unstableRooms', JSON.stringify(rooms));
             
+            gameState.gameStarted = true;
             initializeGame();
         }
 
@@ -866,6 +985,7 @@
             }
             
             gameState.deck = deck;
+            gameState.discardPile = [];
             
             // Initialize player hands and stables
             gameState.players.forEach((player, index) => {
@@ -875,10 +995,12 @@
                 gameState.downgrades[player.id] = [];
                 
                 // Give each player a baby unicorn
-                gameState.stables[player.id].push({
-                    ...cardDefinitions.babyUnicorns[index],
-                    owner: player.id
-                });
+                if (index < cardDefinitions.babyUnicorns.length) {
+                    gameState.stables[player.id].push({
+                        ...cardDefinitions.babyUnicorns[index],
+                        owner: player.id
+                    });
+                }
                 
                 // Deal 5 cards to each player
                 for (let i = 0; i < 5; i++) {
@@ -888,8 +1010,12 @@
                 }
             });
             
-            gameState.currentTurn = 0;
+            gameState.currentTurnIndex = 0;
             gameState.currentPhase = 'beginning';
+            gameState.hasDrawn = false;
+            gameState.hasPlayedThisTurn = false;
+            gameState.actionsRemaining = 1;
+            gameState.turnNumber = 1;
             gameState.lastUpdate = Date.now();
         }
 
@@ -900,38 +1026,90 @@
             
             document.getElementById('win-condition').textContent = gameState.winCondition;
             
+            // Start the first turn properly
+            if (gameState.turnNumber === 1 && gameState.currentPhase === 'beginning') {
+                // Skip beginning phase for first turn
+                gameState.currentPhase = 'action';
+                gameState.actionsRemaining = 1;
+                syncGameState();
+            }
+            
             updateGameBoard();
+        }
+
+        // Check if it's my turn
+        function isMyTurn() {
+            const currentPlayerId = gameState.players[gameState.currentTurnIndex]?.id;
+            return currentPlayerId === gameState.myPlayerId;
         }
 
         // Update game board
         function updateGameBoard() {
             // Update turn indicator
-            const currentPlayer = gameState.players[gameState.currentTurn];
+            const currentPlayer = gameState.players[gameState.currentTurnIndex];
+            if (!currentPlayer) return;
+            
             document.getElementById('turn-indicator').textContent = 
                 `Current Turn: ${currentPlayer.name}`;
+            
+            // Update my turn indicator
+            const myTurnIndicator = document.getElementById('my-turn-indicator');
+            if (isMyTurn()) {
+                myTurnIndicator.textContent = 'YOUR TURN';
+                myTurnIndicator.className = 'my-turn-indicator';
+            } else {
+                myTurnIndicator.textContent = 'NOT YOUR TURN';
+                myTurnIndicator.className = 'my-turn-indicator not-my-turn';
+            }
             
             // Update phase
             const phaseNames = {
                 'beginning': 'Beginning Phase',
-                'draw': 'Draw Phase',
+                'draw': 'Draw Phase', 
                 'action': 'Action Phase',
                 'end': 'End Phase'
             };
             document.getElementById('phase-indicator').textContent = phaseNames[gameState.currentPhase];
             document.getElementById('current-phase-info').textContent = phaseNames[gameState.currentPhase];
             
-            // Update deck count
+            // Update deck and discard counts
             document.getElementById('deck-count').textContent = `${gameState.deck.length} cards`;
             document.getElementById('discard-count').textContent = `${gameState.discardPile.length} cards`;
+            
+            // Enable/disable draw deck based on phase and turn
+            const drawDeck = document.getElementById('draw-deck');
+            if (isMyTurn() && gameState.currentPhase === 'draw' && !gameState.hasDrawn) {
+                drawDeck.classList.remove('disabled');
+            } else {
+                drawDeck.classList.add('disabled');
+            }
+            
+            // Update turn order display
+            const turnOrderDiv = document.getElementById('turn-order');
+            turnOrderDiv.innerHTML = '';
+            gameState.players.forEach((player, index) => {
+                const playerDiv = document.createElement('div');
+                playerDiv.style.fontSize = '0.8em';
+                playerDiv.style.padding = '2px';
+                if (index === gameState.currentTurnIndex) {
+                    playerDiv.style.fontWeight = 'bold';
+                    playerDiv.style.color = '#28a745';
+                }
+                playerDiv.textContent = `${index + 1}. ${player.name}`;
+                turnOrderDiv.appendChild(playerDiv);
+            });
             
             // Update my hand
             const myHand = gameState.hands[gameState.myPlayerId] || [];
             const handContainer = document.getElementById('hand-cards');
             handContainer.innerHTML = '';
+            document.getElementById('hand-count').textContent = myHand.length;
             
             myHand.forEach(card => {
                 const cardElement = createCardElement(card);
-                cardElement.onclick = () => selectCard(card);
+                if (isMyTurn()) {
+                    cardElement.onclick = () => selectCard(card);
+                }
                 handContainer.appendChild(cardElement);
             });
             
@@ -940,7 +1118,22 @@
             const stableContainer = document.getElementById('my-stable-cards');
             stableContainer.innerHTML = '';
             
+            // Add unicorns
             myStable.forEach(card => {
+                const cardElement = createCardElement(card);
+                stableContainer.appendChild(cardElement);
+            });
+            
+            // Add upgrades
+            const myUpgrades = gameState.upgrades[gameState.myPlayerId] || [];
+            myUpgrades.forEach(card => {
+                const cardElement = createCardElement(card);
+                stableContainer.appendChild(cardElement);
+            });
+            
+            // Add downgrades
+            const myDowngrades = gameState.downgrades[gameState.myPlayerId] || [];
+            myDowngrades.forEach(card => {
                 const cardElement = createCardElement(card);
                 stableContainer.appendChild(cardElement);
             });
@@ -950,19 +1143,13 @@
             ).length;
             document.getElementById('my-unicorn-count').textContent = unicornCount;
             
-            // Update upgrades/downgrades
-            const myUpgrades = gameState.upgrades[gameState.myPlayerId] || [];
-            const myDowngrades = gameState.downgrades[gameState.myPlayerId] || [];
-            
-            myUpgrades.forEach(card => {
-                const cardElement = createCardElement(card);
-                stableContainer.appendChild(cardElement);
-            });
-            
-            myDowngrades.forEach(card => {
-                const cardElement = createCardElement(card);
-                stableContainer.appendChild(cardElement);
-            });
+            // Highlight my stable if it's my turn
+            const myStableArea = document.getElementById('my-stable-area');
+            if (isMyTurn()) {
+                myStableArea.classList.add('current-player');
+            } else {
+                myStableArea.classList.remove('current-player');
+            }
             
             // Update opponents area
             const opponentsArea = document.getElementById('opponents-area');
@@ -972,34 +1159,41 @@
                 if (player.id !== gameState.myPlayerId) {
                     const opponentDiv = document.createElement('div');
                     opponentDiv.className = 'opponent-stable';
+                    if (gameState.players[gameState.currentTurnIndex].id === player.id) {
+                        opponentDiv.classList.add('current-player');
+                    }
                     
                     const stable = gameState.stables[player.id] || [];
                     const unicornCount = stable.filter(c => 
                         c.type === 'unicorn' || c.type === 'baby'
                     ).length;
                     
+                    const handCount = gameState.hands[player.id]?.length || 0;
+                    
                     opponentDiv.innerHTML = `
-                        <div class="stable-header">${player.name}'s Stable (${unicornCount} Unicorns)</div>
+                        <div class="stable-header">${player.name}'s Stable (${unicornCount} Unicorns, ${handCount} cards in hand)</div>
                         <div class="stable-cards" id="opponent-${player.id}-stable"></div>
                     `;
                     
                     opponentsArea.appendChild(opponentDiv);
                     
                     const opponentStableContainer = document.getElementById(`opponent-${player.id}-stable`);
+                    
+                    // Add unicorns
                     stable.forEach(card => {
                         const cardElement = createCardElement(card);
                         opponentStableContainer.appendChild(cardElement);
                     });
                     
-                    // Add upgrades/downgrades
+                    // Add upgrades
                     const upgrades = gameState.upgrades[player.id] || [];
-                    const downgrades = gameState.downgrades[player.id] || [];
-                    
                     upgrades.forEach(card => {
                         const cardElement = createCardElement(card);
                         opponentStableContainer.appendChild(cardElement);
                     });
                     
+                    // Add downgrades
+                    const downgrades = gameState.downgrades[player.id] || [];
                     downgrades.forEach(card => {
                         const cardElement = createCardElement(card);
                         opponentStableContainer.appendChild(cardElement);
@@ -1010,6 +1204,22 @@
             // Update actions remaining
             document.getElementById('actions-remaining').textContent = 
                 `${gameState.actionsRemaining} remaining`;
+            
+            // Update action buttons
+            const playBtn = document.getElementById('play-card-btn');
+            const skipBtn = document.getElementById('skip-phase-btn');
+            const endBtn = document.getElementById('end-turn-btn');
+            
+            if (isMyTurn()) {
+                playBtn.disabled = gameState.currentPhase !== 'action' || gameState.actionsRemaining <= 0;
+                skipBtn.disabled = false;
+                endBtn.disabled = false;
+                skipBtn.textContent = gameState.currentPhase === 'draw' ? 'Skip Draw' : 'Skip Phase';
+            } else {
+                playBtn.disabled = true;
+                skipBtn.disabled = true;
+                endBtn.disabled = true;
+            }
             
             // Check for winner
             checkWinCondition();
@@ -1034,41 +1244,65 @@
 
         // Select card
         function selectCard(card) {
-            const currentPlayer = gameState.players[gameState.currentTurn];
-            if (currentPlayer.id !== gameState.myPlayerId) {
-                addGameLog("It's not your turn!");
+            if (!isMyTurn()) {
+                addGameLog("It's not your turn!", true);
                 return;
             }
             
             if (gameState.currentPhase !== 'action') {
-                addGameLog("You can only play cards during the action phase!");
+                addGameLog("You can only play cards during the action phase!", true);
                 return;
             }
             
-            gameState.selectedCard = card;
+            if (gameState.selectedCard && gameState.selectedCard.id === card.id) {
+                gameState.selectedCard = null;
+            } else {
+                gameState.selectedCard = card;
+            }
+            updateGameBoard();
+        }
+
+        // Skip current phase
+        function skipPhase() {
+            if (!isMyTurn()) {
+                addGameLog("It's not your turn!", true);
+                return;
+            }
+            
+            if (gameState.currentPhase === 'beginning') {
+                gameState.currentPhase = 'draw';
+                addGameLog("Skipped beginning phase");
+            } else if (gameState.currentPhase === 'draw') {
+                gameState.currentPhase = 'action';
+                addGameLog("Skipped draw phase");
+            } else if (gameState.currentPhase === 'action') {
+                endTurn();
+                return;
+            }
+            
+            syncGameState();
             updateGameBoard();
         }
 
         // Play selected card
         function playSelectedCard() {
             if (!gameState.selectedCard) {
-                addGameLog("No card selected!");
+                addGameLog("No card selected!", true);
                 return;
             }
             
-            const currentPlayer = gameState.players[gameState.currentTurn];
-            if (currentPlayer.id !== gameState.myPlayerId) {
-                addGameLog("It's not your turn!");
+            if (!isMyTurn()) {
+                addGameLog("It's not your turn!", true);
                 return;
             }
             
             if (gameState.currentPhase !== 'action') {
-                addGameLog("You can only play cards during the action phase!");
+                addGameLog("You can only play cards during the action phase!", true);
                 return;
             }
             
             if (gameState.actionsRemaining <= 0) {
-                addGameLog("No actions remaining!");
+                addGameLog("No actions remaining!", true);
                 return;
             }
             
@@ -1078,7 +1312,7 @@
             const myDowngrades = gameState.downgrades[gameState.myPlayerId] || [];
             for (let downgrade of myDowngrades) {
                 if (downgrade.effect === 'noUpgrades' && card.type === 'upgrade') {
-                    addGameLog("Barbed Wire prevents you from playing upgrades!");
+                    addGameLog("Barbed Wire prevents you from playing upgrades!", true);
                     return;
                 }
                 if (downgrade.effect === 'tinyStable' && 
@@ -1087,13 +1321,25 @@
                         c => c.type === 'unicorn' || c.type === 'baby'
                     ).length;
                     if (unicornCount >= 4) {
-                        addGameLog("Tiny Stable prevents you from playing more unicorns!");
+                        addGameLog("Tiny Stable prevents you from playing more unicorns!", true);
                         return;
                     }
                 }
+                if (downgrade.effect === 'noInstant' && card.type === 'instant') {
+                    addGameLog("Slowdown prevents you from playing instant cards!", true);
+                    return;
+                }
+            }
+            
+            // Remove card from hand first
+            const hand = gameState.hands[gameState.myPlayerId];
+            const index = hand.findIndex(c => c.id === card.id);
+            if (index > -1) {
+                hand.splice(index, 1);
             }
             
             // Play the card based on type
+            let cardPlayed = true;
             switch(card.type) {
                 case 'unicorn':
                 case 'baby':
@@ -1103,8 +1349,10 @@
                     playMagicCard(card);
                     break;
                 case 'instant':
-                    addGameLog("Instant cards can only be played in response to other cards!");
-                    return;
+                    addGameLog("Instant cards can only be played in response to other cards!", true);
+                    hand.push(card); // Put it back
+                    cardPlayed = false;
+                    break;
                 case 'upgrade':
                     playUpgrade(card);
                     break;
@@ -1113,24 +1361,21 @@
                     break;
             }
             
-            gameState.selectedCard = null;
-            gameState.actionsRemaining--;
-            
-            // Remove card from hand
-            const hand = gameState.hands[gameState.myPlayerId];
-            const index = hand.findIndex(c => c.id === card.id);
-            if (index > -1) {
-                hand.splice(index, 1);
+            if (cardPlayed) {
+                gameState.selectedCard = null;
+                gameState.actionsRemaining--;
+                gameState.hasPlayedThisTurn = true;
+                
+                syncGameState();
+                updateGameBoard();
             }
-            
-            syncGameState();
-            updateGameBoard();
         }
 
         // Play unicorn card
         function playUnicorn(card) {
             gameState.stables[gameState.myPlayerId].push(card);
-            addGameLog(`${gameState.currentPlayer.name} played ${card.name}`);
+            const playerName = gameState.players.find(p => p.id === gameState.myPlayerId).name;
+            addGameLog(`${playerName} played ${card.name}`);
             
             // Handle enter effects
             if (card.effect === 'onEnter') {
@@ -1140,8 +1385,15 @@
 
         // Play magic card
         function playMagicCard(card) {
-            addGameLog(`${gameState.currentPlayer.name} played ${card.name}`);
+            const playerName = gameState.players.find(p => p.id === gameState.myPlayerId).name;
+            addGameLog(`${playerName} played ${card.name}`);
             
+            handleMagicEffect(card);
+            gameState.discardPile.push(card);
+        }
+
+        // Handle magic card effects
+        function handleMagicEffect(card) {
             switch(card.effect) {
                 case 'destroy':
                     selectTargetUnicorn('destroy');
@@ -1152,40 +1404,308 @@
                 case 'draw':
                     // Draw 2 cards
                     for (let i = 0; i < 2; i++) {
-                        if (gameState.deck.length > 0) {
-                            gameState.hands[gameState.myPlayerId].push(gameState.deck.pop());
-                        }
+                        drawCardFromDeck(gameState.myPlayerId);
                     }
-                    // TODO: Force discard 3 cards
+                    // Force discard 3
+                    // TODO: Implement discard selection
+                    addGameLog("You must discard 3 cards (not yet implemented)");
+                    break;
+                case 'goodDeal':
+                    // Draw 3 cards
+                    for (let i = 0; i < 3; i++) {
+                        drawCardFromDeck(gameState.myPlayerId);
+                    }
+                    // TODO: Force discard 1
+                    addGameLog("You must discard 1 card (not yet implemented)");
+                    break;
+                case 'shuffle':
+                case 'shakeUp':
+                    // Return hand to deck and shuffle
+                    const hand = gameState.hands[gameState.myPlayerId];
+                    gameState.deck.push(...hand);
+                    gameState.hands[gameState.myPlayerId] = [];
+                    shuffleDeck();
+                    // Draw cards
+                    const drawCount = card.effect === 'shuffle' ? hand.length : 5;
+                    for (let i = 0; i < drawCount; i++) {
+                        drawCardFromDeck(gameState.myPlayerId);
+                    }
                     break;
                 case 'swap':
-                    // TODO: Implement swap
+                    // TODO: Implement unicorn swap
+                    addGameLog("Unicorn swap not yet implemented");
                     break;
-                default:
+                                case 'destroyUpgrade':
+                    selectTargetUpgradeDowngrade('destroy');
+                    break;
+                case 'move':
+                    selectTargetUpgradeDowngrade('move');
+                    break;
+                case 'trade':
+                    selectTargetPlayer((targetId) => {
+                        const myHand = gameState.hands[gameState.myPlayerId];
+                        const targetHand = gameState.hands[targetId];
+                        gameState.hands[gameState.myPlayerId] = targetHand;
+                        gameState.hands[targetId] = myHand;
+                        addGameLog("Traded hands with opponent");
+                        syncGameState();
+                        updateGameBoard();
+                    });
+                    break;
+                case 'sacrifice':
+                    // TODO: Implement Two-For-One
+                    addGameLog("Two-For-One not yet implemented");
+                    break;
+                case 'vortex':
+                    // Shuffle everyone's hand into deck
+                    gameState.players.forEach(player => {
+                        const hand = gameState.hands[player.id] || [];
+                        gameState.deck.push(...hand);
+                        gameState.hands[player.id] = [];
+                    });
+                    shuffleDeck();
+                    // Each player draws 3
+                    gameState.players.forEach(player => {
+                        for (let i = 0; i < 3; i++) {
+                            drawCardFromDeck(player.id);
+                        }
+                    });
+                    break;
+                case 'steal':
+                    // TODO: Implement Blatant Thievery
+                    addGameLog("Card stealing not yet implemented");
                     break;
             }
-            
-            gameState.discardPile.push(card);
         }
 
         // Play upgrade card
         function playUpgrade(card) {
             gameState.upgrades[gameState.myPlayerId].push(card);
-            addGameLog(`${gameState.currentPlayer.name} played upgrade: ${card.name}`);
+            const playerName = gameState.players.find(p => p.id === gameState.myPlayerId).name;
+            addGameLog(`${playerName} played upgrade: ${card.name}`);
             
             // Apply upgrade effects
-            if (card.effect === 'doubleAction') {
-                gameState.actionsRemaining++;
+            if (card.effect === 'doubleAction' && gameState.actionsRemaining === 1) {
+                gameState.actionsRemaining = 2;
+                addGameLog("Double Dutch grants an extra action!");
             }
         }
 
         // Play downgrade card
         function playDowngrade(card) {
             // Select target player
-            selectTargetPlayer((targetId) => {
-                gameState.downgrades[targetId].push(card);
-                addGameLog(`${gameState.currentPlayer.name} gave ${card.name} to opponent`);
+            const modal = document.getElementById('target-modal');
+            const targetList = document.getElementById('target-list');
+            document.getElementById('modal-title').textContent = 'Select player for downgrade';
+            targetList.innerHTML = '';
+            
+            gameState.players.forEach(player => {
+                if (player.id !== gameState.myPlayerId) {
+                    const option = document.createElement('div');
+                    option.className = 'target-option';
+                    option.textContent = player.name;
+                    option.onclick = () => {
+                        gameState.downgrades[player.id].push(card);
+                        const playerName = gameState.players.find(p => p.id === gameState.myPlayerId).name;
+                        addGameLog(`${playerName} gave ${card.name} to ${player.name}`);
+                        closeTargetModal();
+                        syncGameState();
+                        updateGameBoard();
+                    };
+                    targetList.appendChild(option);
+                }
             });
+            
+            modal.style.display = 'flex';
+        }
+
+        // Handle unicorn effects
+        function handleUnicornEffect(card) {
+            switch(card.name) {
+                case 'Rainbow Unicorn':
+                    // Bring a basic unicorn from hand to stable
+                    const basicInHand = gameState.hands[gameState.myPlayerId].find(
+                        c => c.name === 'Basic Unicorn'
+                    );
+                    if (basicInHand) {
+                        const index = gameState.hands[gameState.myPlayerId].findIndex(
+                            c => c.id === basicInHand.id
+                        );
+                        gameState.hands[gameState.myPlayerId].splice(index, 1);
+                        gameState.stables[gameState.myPlayerId].push(basicInHand);
+                        addGameLog("Rainbow Unicorn brought a Basic Unicorn into play!");
+                    }
+                    break;
+                case 'Puppicorn':
+                case 'Greedy Flying Unicorn':
+                    // Draw a card
+                    drawCardFromDeck(gameState.myPlayerId);
+                    addGameLog(`Drew a card from ${card.name}'s effect`);
+                    break;
+                case 'Rhinocorn':
+                    selectTargetUnicorn('destroy');
+                    break;
+                case 'Stabby Unicorn':
+                    selectTargetUpgradeDowngrade('destroy');
+                    break;
+                case 'Extremely Destructive Unicorn':
+                    // Each player sacrifices a unicorn
+                    addGameLog("Each player must sacrifice a unicorn!");
+                    // TODO: Implement sacrifice selection for all players
+                    break;
+                case 'Llamacorn':
+                    // Each player discards a card
+                    addGameLog("Each player must discard a card!");
+                    // TODO: Implement discard for all players
+                    break;
+                case 'Seductive Unicorn':
+                    selectTargetUnicorn('steal');
+                    break;
+            }
+        }
+
+        // Draw card from deck
+        function drawCardFromDeck(playerId) {
+            if (gameState.deck.length === 0) {
+                // Shuffle discard pile back into deck
+                if (gameState.discardPile.length > 0) {
+                    gameState.deck = [...gameState.discardPile];
+                    gameState.discardPile = [];
+                    shuffleDeck();
+                    addGameLog("Shuffled discard pile into deck");
+                }
+            }
+            
+            if (gameState.deck.length > 0) {
+                const card = gameState.deck.pop();
+                gameState.hands[playerId].push(card);
+                return true;
+            }
+            return false;
+        }
+
+        // Shuffle deck
+        function shuffleDeck() {
+            for (let i = gameState.deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [gameState.deck[i], gameState.deck[j]] = [gameState.deck[j], gameState.deck[i]];
+            }
+        }
+
+        // Draw card (action)
+        function drawCard() {
+            if (!isMyTurn()) {
+                addGameLog("It's not your turn!", true);
+                return;
+            }
+            
+            if (gameState.currentPhase !== 'draw') {
+                addGameLog("You can only draw during the draw phase!", true);
+                return;
+            }
+            
+            if (gameState.hasDrawn) {
+                addGameLog("You've already drawn this turn!", true);
+                return;
+            }
+            
+            let drawCount = 1;
+            
+            // Check for upgrades that affect drawing
+            const myUpgrades = gameState.upgrades[gameState.myPlayerId] || [];
+            if (myUpgrades.find(u => u.effect === 'extraDraw')) {
+                drawCount = 2;
+                addGameLog("Summoning Ritual lets you draw an extra card!");
+            }
+            
+            for (let i = 0; i < drawCount; i++) {
+                if (drawCardFromDeck(gameState.myPlayerId)) {
+                    addGameLog("Drew a card");
+                } else {
+                    addGameLog("No cards left to draw!");
+                }
+            }
+            
+            gameState.hasDrawn = true;
+            
+            // Auto-advance to action phase
+            gameState.currentPhase = 'action';
+            addGameLog("Entering Action Phase");
+            
+            syncGameState();
+            updateGameBoard();
+        }
+
+        // End turn
+        function endTurn() {
+            if (!isMyTurn()) {
+                addGameLog("It's not your turn!", true);
+                return;
+            }
+            
+            // Check hand limit (7 cards max, or 10 with Caffeine Overload)
+            const hand = gameState.hands[gameState.myPlayerId];
+            const myUpgrades = gameState.upgrades[gameState.myPlayerId] || [];
+            const handLimit = myUpgrades.find(u => u.effect === 'handLimit') ? 10 : 7;
+            
+            if (hand.length > handLimit) {
+                addGameLog(`You must discard ${hand.length - handLimit} cards!`, true);
+                // TODO: Implement discard selection
+                return;
+            }
+            
+            const currentPlayerName = gameState.players[gameState.currentTurnIndex].name;
+            addGameLog(`${currentPlayerName} ended their turn`);
+            
+            // Move to next player
+            gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
+            
+            // If we've gone around, increment turn number
+            if (gameState.currentTurnIndex === 0) {
+                gameState.turnNumber++;
+            }
+            
+            // Reset turn state
+            gameState.currentPhase = 'beginning';
+            gameState.actionsRemaining = 1;
+            gameState.hasDrawn = false;
+            gameState.hasPlayedThisTurn = false;
+            
+            // Check for Double Dutch upgrade for next player
+            const nextPlayerId = gameState.players[gameState.currentTurnIndex].id;
+            const nextUpgrades = gameState.upgrades[nextPlayerId] || [];
+            if (nextUpgrades.find(u => u.effect === 'doubleAction')) {
+                gameState.actionsRemaining = 2;
+            }
+            
+            // Handle beginning of turn effects
+            handleBeginningOfTurn(nextPlayerId);
+            
+            syncGameState();
+            updateGameBoard();
+        }
+
+        // Handle beginning of turn effects
+        function handleBeginningOfTurn(playerId) {
+            const stable = gameState.stables[playerId] || [];
+            const downgrades = gameState.downgrades[playerId] || [];
+            
+            // Check for Sadistic Ritual
+            const sadisticRitual = downgrades.find(d => d.effect === 'sacrifice');
+            if (sadisticRitual && stable.length > 0) {
+                addGameLog(`${gameState.players.find(p => p.id === playerId).name} must sacrifice a unicorn due to Sadistic Ritual!`);
+                // TODO: Implement forced sacrifice
+            }
+            
+            // Auto-advance to draw phase after a short delay
+            if (isMyTurn()) {
+                setTimeout(() => {
+                    gameState.currentPhase = 'draw';
+                    addGameLog("Entering Draw Phase");
+                    syncGameState();
+                    updateGameBoard();
+                }, 1000);
+            }
         }
 
         // Select target unicorn
@@ -1195,10 +1715,11 @@
             Object.keys(gameState.stables).forEach(playerId => {
                 gameState.stables[playerId].forEach(unicorn => {
                     if (unicorn.type === 'unicorn' || unicorn.type === 'baby') {
+                        const owner = gameState.players.find(p => p.id === playerId);
                         allUnicorns.push({
                             ...unicorn,
                             ownerId: playerId,
-                            ownerName: gameState.players.find(p => p.id === playerId).name
+                            ownerName: owner ? owner.name : 'Unknown'
                         });
                     }
                 });
@@ -1212,6 +1733,10 @@
             // Show target modal
             const modal = document.getElementById('target-modal');
             const targetList = document.getElementById('target-list');
+            document.getElementById('modal-title').textContent = 
+                action === 'destroy' ? 'Select unicorn to destroy' :
+                action === 'return' ? 'Select unicorn to return' :
+                action === 'steal' ? 'Select unicorn to steal' : 'Select target';
             targetList.innerHTML = '';
             
             allUnicorns.forEach(unicorn => {
@@ -1223,6 +1748,64 @@
                         destroyUnicorn(unicorn.ownerId, unicorn.id);
                     } else if (action === 'return') {
                         returnUnicorn(unicorn.ownerId, unicorn.id);
+                    } else if (action === 'steal') {
+                        stealUnicorn(unicorn.ownerId, unicorn.id);
+                    }
+                    closeTargetModal();
+                };
+                targetList.appendChild(option);
+            });
+            
+            modal.style.display = 'flex';
+        }
+
+        // Select target upgrade/downgrade
+        function selectTargetUpgradeDowngrade(action) {
+            const allCards = [];
+            
+            gameState.players.forEach(player => {
+                const upgrades = gameState.upgrades[player.id] || [];
+                const downgrades = gameState.downgrades[player.id] || [];
+                
+                upgrades.forEach(card => {
+                    allCards.push({
+                        ...card,
+                        ownerId: player.id,
+                        ownerName: player.name
+                    });
+                });
+                
+                downgrades.forEach(card => {
+                    allCards.push({
+                        ...card,
+                        ownerId: player.id,
+                        ownerName: player.name
+                    });
+                });
+            });
+            
+            if (allCards.length === 0) {
+                addGameLog("No upgrades or downgrades to target!");
+                return;
+            }
+            
+            const modal = document.getElementById('target-modal');
+            const targetList = document.getElementById('target-list');
+            document.getElementById('modal-title').textContent = 
+                action === 'destroy' ? 'Select upgrade/downgrade to destroy' :
+                action === 'move' ? 'Select upgrade/downgrade to move' : 'Select target';
+            targetList.innerHTML = '';
+            
+            allCards.forEach(card => {
+                const option = document.createElement('div');
+                option.className = 'target-option';
+                option.textContent = `${card.ownerName}'s ${card.name}`;
+                option.onclick = () => {
+                    if (action === 'destroy') {
+                        destroyUpgradeDowngrade(card.ownerId, card.id, card.type);
+                    } else if (action === 'move') {
+                        // TODO: Implement move upgrade/downgrade
+                        addGameLog("Moving upgrades/downgrades not yet implemented");
                     }
                     closeTargetModal();
                 };
@@ -1236,6 +1819,7 @@
         function selectTargetPlayer(callback) {
             const modal = document.getElementById('target-modal');
             const targetList = document.getElementById('target-list');
+            document.getElementById('modal-title').textContent = 'Select target player';
             targetList.innerHTML = '';
             
             gameState.players.forEach(player => {
@@ -1246,8 +1830,6 @@
                     option.onclick = () => {
                         callback(player.id);
                         closeTargetModal();
-                        syncGameState();
-                        updateGameBoard();
                     };
                     targetList.appendChild(option);
                 }
@@ -1269,6 +1851,15 @@
                 const destroyed = stable.splice(index, 1)[0];
                 gameState.discardPile.push(destroyed);
                 addGameLog(`Destroyed ${destroyed.name}`);
+                
+                // Check for Angel Unicorn effect
+                gameState.players.forEach(player => {
+                    const playerStable = gameState.stables[player.id] || [];
+                    if (playerStable.find(c => c.name === 'Angel Unicorn')) {
+                        drawCardFromDeck(player.id);
+                        addGameLog(`${player.name} drew a card from Angel Unicorn's effect`);
+                    }
+                });
             }
             syncGameState();
             updateGameBoard();
@@ -1287,132 +1878,41 @@
             updateGameBoard();
         }
 
-        // Handle unicorn effects
-        function handleUnicornEffect(card) {
-            switch(card.name) {
-                case 'Rainbow Unicorn':
-                    // Bring a basic unicorn from hand to stable
-                    const basicInHand = gameState.hands[gameState.myPlayerId].find(
-                        c => c.name === 'Basic Unicorn'
-                    );
-                    if (basicInHand) {
-                        playUnicorn(basicInHand);
-                    }
-                    break;
-                case 'Puppicorn':
-                    // Draw a card
-                    if (gameState.deck.length > 0) {
-                        gameState.hands[gameState.myPlayerId].push(gameState.deck.pop());
-                        addGameLog("Drew a card from Puppicorn's effect");
-                    }
-                    break;
-                case 'Rhinocorn':
-                    selectTargetUnicorn('destroy');
-                    break;
-                case 'Stabby Unicorn':
-                    // TODO: Destroy upgrade/downgrade
-                    break;
-                case 'Extremely Destructive Unicorn':
-                    // Each player sacrifices a unicorn
-                    addGameLog("Each player must sacrifice a unicorn!");
-                    // TODO: Implement sacrifice selection
-                    break;
-                default:
-                    break;
+        // Steal unicorn
+        function stealUnicorn(ownerId, unicornId) {
+            const stable = gameState.stables[ownerId];
+            const index = stable.findIndex(c => c.id === unicornId);
+            if (index > -1) {
+                const stolen = stable.splice(index, 1)[0];
+                gameState.stables[gameState.myPlayerId].push(stolen);
+                addGameLog(`Stole ${stolen.name}!`);
+                
+                // TODO: Return at end of turn for Seductive Unicorn
             }
+            syncGameState();
+            updateGameBoard();
         }
 
-        // Draw card
-        function drawCard() {
-            const currentPlayer = gameState.players[gameState.currentTurn];
-            if (currentPlayer.id !== gameState.myPlayerId) {
-                addGameLog("It's not your turn!");
-                return;
+        // Destroy upgrade/downgrade
+        function destroyUpgradeDowngrade(ownerId, cardId, cardType) {
+            const array = cardType === 'upgrade' ? gameState.upgrades[ownerId] : gameState.downgrades[ownerId];
+            const index = array.findIndex(c => c.id === cardId);
+            if (index > -1) {
+                const destroyed = array.splice(index, 1)[0];
+                gameState.discardPile.push(destroyed);
+                addGameLog(`Destroyed ${destroyed.name}`);
             }
-            
-            if (gameState.currentPhase !== 'draw') {
-                addGameLog("You can only draw during the draw phase!");
-                return;
-            }
-            
-            if (gameState.drawnThisTurn) {
-                addGameLog("You've already drawn this turn!");
-                return;
-            }
-            
-            if (gameState.deck.length === 0) {
-                // Shuffle discard pile back into deck
-                gameState.deck = [...gameState.discardPile];
-                gameState.discardPile = [];
-                // Shuffle
-                for (let i = gameState.deck.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [gameState.deck[i], gameState.deck[j]] = [gameState.deck[j], gameState.deck[i]];
-                }
-            }
-            
-            if (gameState.deck.length > 0) {
-                const card = gameState.deck.pop();
-                gameState.hands[gameState.myPlayerId].push(card);
-                gameState.drawnThisTurn = true;
-                addGameLog("Drew a card");
-                
-                // Auto-advance to action phase
-                gameState.currentPhase = 'action';
-                
-                syncGameState();
-                updateGameBoard();
-            }
-        }
-
-        // End turn
-        function endTurn() {
-            const currentPlayer = gameState.players[gameState.currentTurn];
-            if (currentPlayer.id !== gameState.myPlayerId) {
-                addGameLog("It's not your turn!");
-                return;
-            }
-            
-            // Check hand limit (7 cards max)
-            const hand = gameState.hands[gameState.myPlayerId];
-            if (hand.length > 7) {
-                addGameLog(`You must discard ${hand.length - 7} cards!`);
-                // TODO: Implement discard selection
-                return;
-            }
-            
-            // Move to next player
-            gameState.currentTurn = (gameState.currentTurn + 1) % gameState.players.length;
-            gameState.currentPhase = 'beginning';
-            gameState.actionsRemaining = 1;
-            gameState.drawnThisTurn = false;
-            
-            // Check for Double Dutch upgrade
-            const nextPlayerId = gameState.players[gameState.currentTurn].id;
-            const upgrades = gameState.upgrades[nextPlayerId] || [];
-            if (upgrades.find(u => u.effect === 'doubleAction')) {
-                gameState.actionsRemaining = 2;
-            }
-            
-            addGameLog(`${currentPlayer.name} ended their turn`);
-            
-            // Auto-advance to draw phase for next player
-            setTimeout(() => {
-                gameState.currentPhase = 'draw';
-                syncGameState();
-                updateGameBoard();
-            }, 1000);
-            
             syncGameState();
             updateGameBoard();
         }
 
         // Add game log entry
-        function addGameLog(message) {
+        function addGameLog(message, isError = false) {
             const logContainer = document.getElementById('game-log-entries');
             const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.textContent = message;
+            entry.className = 'log-entry' + (isError ? ' error' : '');
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
             logContainer.appendChild(entry);
             logContainer.scrollTop = logContainer.scrollHeight;
         }
@@ -1421,15 +1921,22 @@
         function checkWinCondition() {
             for (let player of gameState.players) {
                 const stable = gameState.stables[player.id] || [];
-                const unicornCount = stable.filter(c => 
+                let unicornCount = stable.filter(c => 
                     c.type === 'unicorn' || c.type === 'baby'
                 ).length;
                 
-                // Check for Americorn
+                // Check for special cards
                 const hasAmericorn = stable.find(c => c.name === 'Americorn');
-                const effectiveCount = hasAmericorn ? unicornCount * 2 : unicornCount;
+                const hasGinormous = stable.find(c => c.name === 'Ginormous Unicorn');
                 
-                if (effectiveCount >= gameState.winCondition) {
+                if (hasAmericorn) {
+                    unicornCount *= 2;
+                }
+                if (hasGinormous) {
+                    unicornCount++; // Ginormous counts as 2, so add 1
+                }
+                
+                if (unicornCount >= gameState.winCondition) {
                     showWinner(player);
                     return;
                 }
@@ -1455,13 +1962,21 @@
         function syncGameState() {
             gameState.lastUpdate = Date.now();
             const rooms = JSON.parse(localStorage.getItem('unstableRooms'));
-            if (rooms[gameState.roomCode]) {
-                rooms[gameState.roomCode].gameState = gameState;
+            if (rooms && rooms[gameState.roomCode]) {
+                // Preserve each player's specific ID when syncing
+                const preservedIds = {};
+                if (rooms[gameState.roomCode].gameState) {
+                    gameState.players.forEach(player => {
+                        preservedIds[player.id] = player.id;
+                    });
+                }
+                
+                rooms[gameState.roomCode].gameState = {...gameState};
                 localStorage.setItem('unstableRooms', JSON.stringify(rooms));
             }
         }
 
-        // Initialize
+        // Initialize on page load
         initLocalMultiplayer();
     </script>
 </body>
