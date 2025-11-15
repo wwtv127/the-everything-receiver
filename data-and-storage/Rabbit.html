@@ -8,6 +8,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; }
+        
         /* Ensures the iframe is responsive and maintains a 16:9 aspect ratio */
         .video-container {
             position: relative;
@@ -30,47 +31,47 @@
             display: flex;
             align-items: center;
             background-color: #1a1a1a;
-            border-radius: 8px;
+            border-radius: 6px; /* Slightly smaller rounding */
             overflow: hidden;
             cursor: pointer;
             transition: transform 0.15s, box-shadow 0.15s;
         }
         .result-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+            transform: translateY(-1px); /* Reduced hover effect */
+            box-shadow: 0 3px 10px rgba(255, 0, 0, 0.2);
         }
     </style>
 </head>
-<body class="p-4 sm:p-6 min-h-screen">
+<body class="p-3 min-h-screen">
     <div class="max-w-md mx-auto">
-        <h1 class="text-3xl font-bold text-center mb-6 text-red-500">
-            r1 Tube <span class="text-sm font-normal text-gray-400">Official</span>
+        <h1 class="text-2xl font-bold text-center mb-4 text-red-500">
+            r1 Tube <span class="text-xs font-normal text-gray-400">Official</span>
         </h1>
 
         <!-- Search Section -->
-        <div class="flex space-x-2 mb-6">
+        <div class="flex space-x-2 mb-4">
             <input 
                 type="text" 
                 id="searchQuery" 
-                placeholder="Search videos (e.g., 'latest r1 review')"
-                class="flex-grow p-3 bg-gray-800 text-white rounded-lg border-2 border-red-500 focus:outline-none focus:border-red-400"
+                placeholder="Search videos (e.g., 'r1 tips and tricks')"
+                class="flex-grow p-2.5 bg-gray-800 text-white text-sm rounded-lg border-2 border-red-500 focus:outline-none focus:border-red-400"
             >
             <button 
                 id="searchButton"
-                class="p-3 w-12 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg shadow-md transition duration-200 flex items-center justify-center"
+                class="p-2.5 w-10 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg shadow-md transition duration-200 flex items-center justify-center"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </button>
         </div>
 
         <!-- Warning for API Key -->
-        <div id="apiKeyWarning" class="p-3 mb-4 bg-yellow-900 border border-yellow-500 text-sm text-yellow-300 rounded-lg">
+        <div id="apiKeyWarning" class="p-2 mb-3 bg-yellow-900 border border-yellow-500 text-xs text-yellow-300 rounded-lg">
             ⚠️ **ALERT:** Replace `YOUR_YOUTUBE_API_KEY` in the script for functionality.
         </div>
 
         <!-- Loading Indicator -->
-        <div id="loadingIndicator" class="hidden text-center text-red-500 font-semibold mb-4">
-            <svg class="animate-spin h-5 w-5 mr-3 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <div id="loadingIndicator" class="hidden text-center text-red-500 font-semibold mb-3">
+            <svg class="animate-spin h-4 w-4 mr-2 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -78,22 +79,22 @@
         </div>
 
         <!-- Video Player Section -->
-        <div id="videoPlayerContainer" class="mb-6 hidden">
-            <h2 id="videoTitle" class="text-lg font-semibold mb-3 text-gray-200"></h2>
-            <div class="video-container shadow-2xl shadow-red-900">
+        <div id="videoPlayerContainer" class="mb-4 hidden">
+            <h2 id="videoTitle" class="text-base font-semibold mb-2 text-gray-200"></h2>
+            <div class="video-container shadow-xl shadow-red-900">
                 <iframe id="youtubeIframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
             </div>
             <p class="text-xs text-gray-500 mt-2">Video playback is handled by the official YouTube player.</p>
         </div>
 
         <!-- Search Results (Will be populated by JS) -->
-        <div id="resultsContainer" class="space-y-4">
-            <p class="text-center text-gray-500">Search for a video to begin!</p>
+        <div id="resultsContainer" class="space-y-3">
+            <p class="text-center text-gray-500 text-sm">Search for a video to begin!</p>
         </div>
     </div>
 
     <script>
-        const API_KEY = 'AIzaSyBzB8j2OwAR6-PaIqWIijmZEdkw8gmFznQ'; // <<< !!! REPLACE THIS PLACEHOLDER !!!
+        const API_KEY = 'YOUR_YOUTUBE_API_KEY'; // <<< !!! REPLACE THIS PLACEHOLDER !!!
 
         const searchQueryElement = document.getElementById('searchQuery');
         const searchButton = document.getElementById('searchButton');
@@ -111,7 +112,6 @@
 
         /**
          * Converts YouTube's duration format (e.g., PT1H30M15S) to readable text.
-         * Simple approach for display.
          * @param {string} duration The ISO 8601 duration string.
          * @returns {string} Readable duration string.
          */
@@ -137,8 +137,11 @@
          * @param {string} query The search term.
          */
         async function searchYouTube(query) {
+            // Dismiss the mobile keyboard immediately upon initiating search
+            searchQueryElement.blur(); 
+            
             if (API_KEY === 'YOUR_YOUTUBE_API_KEY') {
-                resultsContainer.innerHTML = `<p class="text-center text-red-400">Please set a valid YouTube Data API key to search.</p>`;
+                resultsContainer.innerHTML = `<p class="text-center text-red-400 text-sm">Please set a valid YouTube Data API key to search.</p>`;
                 apiKeyWarning.classList.remove('hidden');
                 return;
             }
@@ -159,14 +162,14 @@
                 }
                 
                 if (!searchData.items || searchData.items.length === 0) {
-                    resultsContainer.innerHTML = `<p class="text-center text-gray-500">No videos found for "${query}".</p>`;
+                    resultsContainer.innerHTML = `<p class="text-center text-gray-500 text-sm">No videos found for "${query}".</p>`;
                     return;
                 }
 
                 // Get comma-separated list of video IDs for details (like duration)
                 const videoIds = searchData.items.map(item => item.id.videoId).join(',');
                 
-                // Fetch content details (primarily for duration, though not strictly required for playback)
+                // Fetch content details (primarily for duration)
                 const DETAILS_URL = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoIds}&key=${API_KEY}`;
                 const detailsResponse = await fetch(DETAILS_URL);
                 const detailsData = await detailsResponse.json();
@@ -175,7 +178,7 @@
 
             } catch (error) {
                 console.error("YouTube API Error:", error);
-                resultsContainer.innerHTML = `<p class="text-center text-red-400">Error: ${error.message}. Check your API Key and network connection.</p>`;
+                resultsContainer.innerHTML = `<p class="text-center text-red-400 text-sm">Error: ${error.message}. Check your API Key and network connection.</p>`;
             } finally {
                 loadingIndicator.classList.add('hidden');
                 searchButton.disabled = false;
@@ -194,7 +197,8 @@
                 const channel = video.snippet.channelTitle;
                 const videoId = video.id;
                 const duration = video.contentDetails ? parseDuration(video.contentDetails.duration) : '';
-                const thumbnailUrl = video.snippet.thumbnails.medium.url;
+                // Use default or medium thumbnail
+                const thumbnailUrl = video.snippet.thumbnails.default.url || video.snippet.thumbnails.medium.url;
                 
                 const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 
@@ -203,11 +207,11 @@
                 resultElement.onclick = () => playVideo(embedUrl, title);
                 
                 resultElement.innerHTML = `
-                    <img src="${thumbnailUrl}" alt="${title}" class="w-24 h-16 object-cover rounded-md flex-shrink-0">
+                    <img src="${thumbnailUrl}" alt="${title}" class="w-20 h-12 object-cover rounded-md flex-shrink-0">
                     <div class="flex-grow p-2 overflow-hidden">
-                        <p class="font-semibold text-sm truncate text-gray-100">${title}</p>
-                        <p class="text-xs text-red-400">${channel}</p>
-                        ${duration ? `<span class="text-xs text-gray-400">Duration: ${duration}</span>` : ''}
+                        <p class="font-semibold text-xs truncate text-gray-100">${title}</p>
+                        <p class="text-[10px] text-red-400">${channel}</p>
+                        ${duration ? `<span class="text-[10px] text-gray-400">Duration: ${duration}</span>` : ''}
                     </div>
                 `;
                 
