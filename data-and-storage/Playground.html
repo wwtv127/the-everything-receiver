@@ -3,233 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rabbit R1 Control Playground (R1 Keycodes)</title>
+    <title>Rabbit R1 Keycode Detector</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8; /* Light gray background */
+            background-color: #f0f4f8;
+            min-height: 100vh;
         }
         .status-box {
-            transition: all 0.15s ease-in-out;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
-<body class="p-4 sm:p-8 flex flex-col items-center justify-center min-h-screen">
+<body class="p-4 sm:p-8 flex flex-col items-center justify-center">
 
     <div class="max-w-4xl w-full">
-        <h1 class="text-3xl sm:text-4xl font-bold text-center mb-8 text-gray-800">
-            Rabbit R1 Control Playground (Inferred R1 Key Mappings)
+        <h1 class="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-800">
+            R1 Keycode Detector & Debugger
         </h1>
+        <p class="text-center mb-8 text-gray-600">
+            Use this tool on your R1 to find the **exact keycodes** the physical buttons send.
+        </p>
 
         <!-- Instructions Panel -->
-        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h2 class="text-xl font-semibold mb-3 text-red-500">How to Simulate (R1 Key Mappings):</h2>
-            <ul class="list-disc list-inside space-y-2 text-gray-600 font-medium">
-                <li>**Scroll Wheel:** The R1 physical scroll is mapped to **`ArrowUp`** and **`ArrowDown`** key events.</li>
-                <li>**Side Button 1 (PTT):** The physical button is mapped to the **`P` key** (`KeyP`).</li>
-                <li>**Side Button 2 (Action):** The physical button is mapped to the **`A` key** (`KeyA`).</li>
+        <div class="bg-red-50 p-6 rounded-xl shadow-lg mb-8 border-l-4 border-red-500">
+            <h2 class="text-xl font-semibold mb-3 text-red-500">How to Use:</h2>
+            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                <li>Load this page on your Rabbit R1.</li>
+                <li>**Press and Hold PTT:** Note the codes that appear in the Status section.</li>
+                <li>**Press Action Button:** Note the codes that appear.</li>
+                <li>**Move Scroll Wheel:** Note the codes that appear.</li>
+                <li><strong class="text-red-700">The `event.code` is the value you need for your final game logic!</strong></li>
             </ul>
-             <p class="mt-4 text-xs italic text-gray-400">
-                This environment listens for the keycodes (`ArrowUp`, `ArrowDown`, `KeyP`, `KeyA`) most commonly reported to be sent by the R1's hardware to the web view.
-            </p>
         </div>
 
-        <!-- Status Displays Container -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-
-            <!-- 1. Scroll Wheel Status -->
-            <div id="scrollStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-500">
-                <p class="text-xs font-medium text-yellow-500 uppercase">R1 Scroll Input</p>
-                <h3 class="text-2xl font-bold mt-1 text-gray-800">Scroll Wheel (&#8593;/&#8595; Arrows)</h3>
-                <p class="text-sm mt-3 text-gray-500">
-                    <span id="scrollDirection" class="font-semibold text-gray-700">Press Arrow Up/Down...</span>
-                </p>
-                <p class="text-xs mt-2 text-gray-400">Total Scrolls: <span id="scrollCount">0</span></p>
-            </div>
-
-            <!-- 2. PTT/Side Button 1 Status -->
-            <div id="pttStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-500">
-                <p class="text-xs font-medium text-red-500 uppercase">R1 PTT Input</p>
-                <h3 class="text-2xl font-bold mt-1 text-gray-800">Side Button 1 (Key P)</h3>
-                <p id="pttState" class="text-sm mt-3 font-semibold text-gray-700">Released</p>
-                <p class="text-xs mt-2 text-gray-400">Status: Key Down/Key Up</p>
-            </div>
-
-            <!-- 3. Action/Side Button 2 Status -->
-            <div id="actionStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
-                <p class="text-xs font-medium text-blue-500 uppercase">R1 Action Input</p>
-                <h3 class="text-2xl font-bold mt-1 text-gray-800">Side Button 2 (Key A)</h3>
-                <p id="actionState" class="text-sm mt-3 font-semibold text-gray-700">Released</p>
-                <p class="text-xs mt-2 text-gray-400">Status: Key Down/Key Up</p>
-            </div>
-        </div>
-        
-        <!-- Touchpad to detect if a "virtual" arrow is being sent by a drag gesture -->
-        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg w-full">
-            <h3 class="text-lg font-semibold text-gray-800 mb-2">Touch/Swipe Area</h3>
-            <div id="touchArea" class="h-24 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-500 text-sm">
-                Try swiping up or down here. If the scroll status changes, the R1 maps swipe gestures to Arrow Keys.
-            </div>
+        <!-- Scroll Debug Area -->
+        <div id="scrollDebug" class="status-box bg-white p-6 rounded-xl shadow-lg mb-6 border-l-4 border-yellow-500">
+            <p class="text-xs font-medium text-yellow-500 uppercase">Scroll Wheel Debugger</p>
+            <h3 class="text-2xl font-bold mt-1 text-gray-800 mb-2">Last Scroll Direction</h3>
+            <p id="scrollOutput" class="text-lg font-mono text-gray-700">--- Waiting for scroll event ---</p>
         </div>
 
+        <!-- Keypress Debug Area -->
+        <div id="keypressDebug" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
+            <p class="text-xs font-medium text-blue-500 uppercase">Keypress Detector (PTT / Action Buttons)</p>
+            <h3 class="text-2xl font-bold mt-1 text-gray-800 mb-2">Last Keydown Event</h3>
+            <div class="grid grid-cols-3 gap-4 text-sm font-mono text-gray-700 mb-4">
+                <div><span class="font-bold text-blue-600">Key:</span> <span id="keyVal">N/A</span></div>
+                <div><span class="font-bold text-blue-600">Code:</span> <span id="codeVal">N/A</span></div>
+                <div><span class="font-bold text-blue-600">KeyCode:</span> <span id="keyCodeVal">N/A</span></div>
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Keypress History</h3>
+            <div id="history" class="h-32 overflow-y-scroll bg-gray-100 p-2 rounded text-xs font-mono">
+                <p class="text-gray-500">Press a button to see history...</p>
+            </div>
+        </div>
     </div>
 
     <script>
         // DOM Elements
-        const pttStatus = document.getElementById('pttStatus');
-        const pttState = document.getElementById('pttState');
-        const actionStatus = document.getElementById('actionStatus');
-        const actionState = document.getElementById('actionState');
-        const scrollDirection = document.getElementById('scrollDirection');
-        const scrollCountEl = document.getElementById('scrollCount');
-        const touchArea = document.getElementById('touchArea');
-
-        let scrollCounter = 0;
-        let pttPressed = false;
-        let actionPressed = false;
+        const scrollOutput = document.getElementById('scrollOutput');
+        const keyVal = document.getElementById('keyVal');
+        const codeVal = document.getElementById('codeVal');
+        const keyCodeVal = document.getElementById('keyCodeVal');
+        const historyEl = document.getElementById('history');
 
         // --- Utility Functions ---
 
-        function updatePttState(isPressed) {
-            if (pttPressed === isPressed) return;
-            pttPressed = isPressed;
-
-            if (isPressed) {
-                pttState.textContent = 'PRESSED (Listening...)';
-                pttStatus.classList.add('bg-red-100', 'border-red-600');
-                pttStatus.classList.remove('bg-white', 'border-red-500');
-            } else {
-                pttState.textContent = 'Released';
-                pttStatus.classList.add('bg-white', 'border-red-500');
-                pttStatus.classList.remove('bg-red-100', 'border-red-600');
-            }
-        }
-
-        function updateActionState(isPressed) {
-            if (actionPressed === isPressed) return;
-            actionPressed = isPressed;
-
-            if (isPressed) {
-                actionState.textContent = 'PRESSED (Executing Action...)';
-                actionStatus.classList.add('bg-blue-100', 'border-blue-600');
-                actionStatus.classList.remove('bg-white', 'border-blue-500');
-            } else {
-                actionState.textContent = 'Released';
-                actionStatus.classList.add('bg-white', 'border-blue-500');
-                actionStatus.classList.remove('bg-blue-100', 'border-blue-600');
-            }
-        }
-
-        /**
-         * Handles the simulated scroll event (Arrow keys).
-         * @param {string} direction - 'Up' or 'Down'
-         */
-        function handleSimulatedScroll(direction) {
-            scrollCounter++;
-            scrollCountEl.textContent = scrollCounter;
-
-            const displayDirection = direction === 'Up' ? 'Up (Backward/Previous)' : 'Down (Forward/Next)';
-            scrollDirection.textContent = displayDirection;
-
-            const scrollBox = document.getElementById('scrollStatus');
-            const isDown = direction === 'Down';
+        function updateHistory(type, key, code) {
+            const time = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('p');
+            logEntry.className = (type === 'keydown' ? 'text-red-700' : 'text-green-700');
+            logEntry.textContent = `[${time}] ${type.toUpperCase()}: Key=${key}, Code=${code}`;
             
-            // Visual feedback
-            scrollBox.style.backgroundColor = isDown ? '#fff3cd' : '#d4edda'; // Yellow/Green transient color
-            scrollBox.style.borderColor = isDown ? '#ffc107' : '#28a745';
+            // Add to the top of the history list
+            if (historyEl.firstChild && historyEl.firstChild.tagName === 'P' && historyEl.firstChild.textContent.includes('Press a button')) {
+                 historyEl.removeChild(historyEl.firstChild); // Remove placeholder
+            }
+            historyEl.prepend(logEntry);
 
-            // Reset background color after a short delay
-            clearTimeout(scrollBox.timer);
-            scrollBox.timer = setTimeout(() => {
-                scrollBox.style.backgroundColor = '#ffffff';
-                scrollBox.style.borderColor = '#fbbf24'; // Tailwind yellow-500
-            }, 100);
+            // Limit history to 15 entries
+            if (historyEl.children.length > 15) {
+                historyEl.removeChild(historyEl.lastChild);
+            }
+        }
+
+        function handleScroll(event) {
+            event.preventDefault(); // Prevent page scroll
+            const direction = event.deltaY < 0 ? 'SCROLL UP' : 'SCROLL DOWN';
+            scrollOutput.textContent = direction;
+            scrollOutput.className = `text-lg font-mono text-${event.deltaY < 0 ? 'green' : 'red'}-700`;
         }
 
         // --- Event Listeners ---
 
-        // 1. Listen for the likely R1 key mappings for PTT and Action, and Arrow Keys for Scroll
+        // Listen for all keypress events
         document.addEventListener('keydown', (event) => {
-            // PTT (Side Button 1)
-            if (event.code === 'KeyP') {
-                event.preventDefault(); 
-                updatePttState(true);
-            } 
-            // Action (Side Button 2)
-            else if (event.code === 'KeyA') {
-                event.preventDefault(); 
-                updateActionState(true);
-            }
-            // Scroll Wheel Simulation
-            else if (event.code === 'ArrowUp') {
-                event.preventDefault(); 
-                handleSimulatedScroll('Up');
-            } 
-            else if (event.code === 'ArrowDown') {
-                event.preventDefault(); 
-                handleSimulatedScroll('Down');
-            }
+            event.preventDefault(); 
+            keyVal.textContent = event.key;
+            codeVal.textContent = event.code;
+            keyCodeVal.textContent = event.keyCode;
+            
+            updateHistory('keydown', event.key, event.code);
         });
 
         document.addEventListener('keyup', (event) => {
-            // PTT Release
-            if (event.code === 'KeyP') {
-                event.preventDefault();
-                updatePttState(false);
-            } 
-            // Action Release (typically a momentary button, but useful for hold detection)
-            else if (event.code === 'KeyA') {
-                event.preventDefault();
-                updateActionState(false);
-            }
+            event.preventDefault();
+            updateHistory('keyup', event.key, event.code);
         });
 
-        // 2. Fallback/Testing for standard mouse wheel (in case R1 uses standard events)
-        window.addEventListener('wheel', (event) => {
-             // Only log standard wheel if it's NOT a simulated keypress
-             if (!event.code) { 
-                event.preventDefault(); 
-                handleSimulatedScroll(event.deltaY < 0 ? 'Up' : 'Down');
-             }
-        }, { passive: false });
-
-
-        // 3. Touch/Swipe Detection (to check if R1 converts swipe into Arrow keys)
-        let touchstartY = 0;
-        let touchendY = 0;
-
-        touchArea.addEventListener('touchstart', e => {
-            touchstartY = e.changedTouches[0].screenY;
-        }, false);
-
-        touchArea.addEventListener('touchend', e => {
-            touchendY = e.changedTouches[0].screenY;
-            handleGesture();
-        }, false);
-
-        function handleGesture() {
-            const swipeThreshold = 50; // pixels
-            if (touchendY < touchstartY - swipeThreshold) {
-                // Swiped up
-                console.log("Swipe Up detected (Simulating ArrowUp)");
-                handleSimulatedScroll('Up');
-            }
-            if (touchendY > touchstartY + swipeThreshold) {
-                // Swiped down
-                console.log("Swipe Down detected (Simulating ArrowDown)");
-                handleSimulatedScroll('Down');
-            }
-        }
+        // Listen for standard mouse wheel (in case the R1 scroll wheel sends a standard event)
+        window.addEventListener('wheel', handleScroll, { passive: false });
 
 
         // Initialize state on load
         window.onload = () => {
-            console.log('R1 Simulator Loaded. Inputs: Arrow Keys (Scroll), P Key (PTT), A Key (Action).');
+            console.log('R1 Keycode Detector Loaded.');
         };
-
     </script>
 </body>
 </html>
