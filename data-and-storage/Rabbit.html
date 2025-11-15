@@ -3,116 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>r1 Embedded Browser</title>
+    <title>Official YouTube Client for r1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Base Styles for R1 Screen */
-        body {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            margin: 0;
-            background-color: #000;
-            color: #fff;
-            font-family: sans-serif;
-            box-sizing: border-box;
-        }
-        #browserHeader {
-            display: flex;
-            padding: 10px;
-            background-color: #333;
-            /* Added gap for spacing */
-            gap: 10px;
-        }
-        #urlInput {
-            flex-grow: 1;
-            padding: 8px;
-            border: 1px solid #ff6600;
-            border-radius: 4px;
-            font-size: 0.9rem;
-        }
-        /* Style for both buttons */
-        .headerButton {
-            padding: 8px 15px;
-            background-color: #ff6600;
-            color: #000;
-            border: none;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            font-weight: bold;
-            cursor: pointer;
-            flex-shrink: 0; /* Prevents buttons from shrinking */
-        }
-        #contentFrame {
-            flex-grow: 1;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; }
+        /* Ensures the iframe is responsive and maintains a 16:9 aspect ratio */
+        .video-container {
+            position: relative;
             width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            height: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            border-radius: 8px;
+        }
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             border: none;
-            /* Center the iframe's content when scaled */
-            transform-origin: top left;
+        }
+        .result-card {
+            display: flex;
+            align-items: center;
+            background-color: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
         }
     </style>
 </head>
-<body>
-    <div id="browserHeader">
-        <input type="text" id="urlInput" value="https://www.google.com" required>
-        <button id="goButton" class="headerButton">Go</button>
-        <button id="zoomButton" class="headerButton">Zoom Out</button>
+<body class="p-4 sm:p-6 min-h-screen">
+    <div class="max-w-md mx-auto">
+        <h1 class="text-3xl font-bold text-center mb-6 text-red-500">
+            r1 Tube <span class="text-sm font-normal text-gray-400">Official</span>
+        </h1>
+
+        <!-- Search Section -->
+        <div class="flex space-x-2 mb-6">
+            <input 
+                type="text" 
+                id="searchQuery" 
+                placeholder="Search videos (e.g., 'latest r1 review')"
+                class="flex-grow p-3 bg-gray-800 text-white rounded-lg border-2 border-red-500 focus:outline-none focus:border-red-400"
+            >
+            <button 
+                id="searchButton"
+                class="p-3 w-12 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg shadow-md transition duration-200 flex items-center justify-center"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </button>
+        </div>
+
+        <!-- Warning for API Key -->
+        <div id="apiKeyWarning" class="p-3 mb-4 bg-yellow-900 border border-yellow-500 text-sm text-yellow-300 rounded-lg">
+            ⚠️ **ALERT:** Replace `YOUR_YOUTUBE_API_KEY` in the script for functionality.
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="hidden text-center text-red-500 font-semibold mb-4">
+            <svg class="animate-spin h-5 w-5 mr-3 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Searching YouTube...
+        </div>
+
+        <!-- Video Player Section -->
+        <div id="videoPlayerContainer" class="mb-6 hidden">
+            <h2 id="videoTitle" class="text-lg font-semibold mb-3 text-gray-200"></h2>
+            <div class="video-container shadow-2xl shadow-red-900">
+                <iframe id="youtubeIframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Video playback is handled by the official YouTube player.</p>
+        </div>
+
+        <!-- Search Results (Will be populated by JS) -->
+        <div id="resultsContainer" class="space-y-4">
+            <p class="text-center text-gray-500">Search for a video to begin!</p>
+        </div>
     </div>
 
-    <iframe id="contentFrame" src="https://www.google.com"></iframe>
-
     <script>
-        const urlInput = document.getElementById('urlInput');
-        const goButton = document.getElementById('goButton');
-        const zoomButton = document.getElementById('zoomButton');
-        const contentFrame = document.getElementById('contentFrame');
+        const API_KEY = 'YOUR_YOUTUBE_API_KEY'; // <<< !!! REPLACE THIS PLACEHOLDER !!!
+
+        const searchQueryElement = document.getElementById('searchQuery');
+        const searchButton = document.getElementById('searchButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const videoPlayerContainer = document.getElementById('videoPlayerContainer');
+        const youtubeIframe = document.getElementById('youtubeIframe');
+        const videoTitleElement = document.getElementById('videoTitle');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const apiKeyWarning = document.getElementById('apiKeyWarning');
         
-        // Initial zoom level (1.0 = 100%)
-        let currentScale = 1.0;
-        const scaleStep = 0.2; // How much to zoom in/out with each click
-        const minScale = 0.4; // Smallest zoom level
-        const maxScale = 1.0; // Largest zoom level (default)
-
-        // Function to handle navigation
-        function navigate() {
-            let url = urlInput.value.trim();
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                url = 'https://' + url;
-                urlInput.value = url;
-            }
-            contentFrame.src = url;
+        // Hide warning if key is set (though in a real scenario, this key should be restricted)
+        if (API_KEY !== 'YOUR_YOUTUBE_API_KEY') {
+            apiKeyWarning.classList.add('hidden');
         }
 
-        // Function to handle zoom
-        function adjustZoom() {
-            // Cycle the scale from 1.0 -> 0.8 -> 0.6 -> 0.4, then back to 1.0
-            if (currentScale > minScale) {
-                currentScale = Math.max(minScale, currentScale - scaleStep);
-            } else {
-                // Reset to 1.0 if already at min zoom
-                currentScale = maxScale;
-            }
+        /**
+         * Converts YouTube's duration format (e.g., PT1H30M15S) to readable text.
+         * Simple approach for display.
+         * @param {string} duration The ISO 8601 duration string.
+         * @returns {string} Readable duration string.
+         */
+        function parseDuration(duration) {
+            const matches = duration.match(/PT(\d{1,2}H)?(\d{1,2}M)?(\d{1,2}S)?/);
+            if (!matches) return '';
             
-            // Apply the new scale to the iframe using CSS transform
-            contentFrame.style.transform = `scale(${currentScale})`;
+            const hours = matches[1] ? matches[1].replace('H', '') : '00';
+            const minutes = matches[2] ? matches[2].replace('M', '') : '00';
+            const seconds = matches[3] ? matches[3].replace('S', '') : '00';
+            
+            const parts = [];
+            if (hours !== '00') parts.push(hours.padStart(2, '0'));
+            parts.push(minutes.padStart(2, '0'));
+            parts.push(seconds.padStart(2, '0'));
+            
+            return parts.join(':');
+        }
 
-            // Update button text to reflect next action
-            if (currentScale === maxScale) {
-                zoomButton.textContent = "Zoom Out";
-            } else {
-                zoomButton.textContent = "Zoom In";
+
+        /**
+         * Fetches YouTube video search results using the official YouTube Data API v3.
+         * @param {string} query The search term.
+         */
+        async function searchYouTube(query) {
+            if (API_KEY === 'YOUR_YOUTUBE_API_KEY') {
+                resultsContainer.innerHTML = `<p class="text-center text-red-400">Please set a valid YouTube Data API key to search.</p>`;
+                apiKeyWarning.classList.remove('hidden');
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            searchButton.disabled = true;
+            resultsContainer.innerHTML = '';
+            videoPlayerContainer.classList.add('hidden');
+            
+            const YOUTUBE_SEARCH_URL = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}&maxResults=10`;
+            
+            try {
+                const searchResponse = await fetch(YOUTUBE_SEARCH_URL);
+                const searchData = await searchResponse.json();
+
+                if (searchData.error) {
+                    throw new Error(searchData.error.message);
+                }
+                
+                if (!searchData.items || searchData.items.length === 0) {
+                    resultsContainer.innerHTML = `<p class="text-center text-gray-500">No videos found for "${query}".</p>`;
+                    return;
+                }
+
+                // Get comma-separated list of video IDs for details (like duration)
+                const videoIds = searchData.items.map(item => item.id.videoId).join(',');
+                
+                // Fetch content details (primarily for duration, though not strictly required for playback)
+                const DETAILS_URL = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoIds}&key=${API_KEY}`;
+                const detailsResponse = await fetch(DETAILS_URL);
+                const detailsData = await detailsResponse.json();
+
+                displayResults(detailsData.items || []);
+
+            } catch (error) {
+                console.error("YouTube API Error:", error);
+                resultsContainer.innerHTML = `<p class="text-center text-red-400">Error: ${error.message}. Check your API Key and network connection.</p>`;
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                searchButton.disabled = false;
             }
         }
 
-        goButton.addEventListener('click', navigate);
-        zoomButton.addEventListener('click', adjustZoom);
+        /**
+         * Displays structured results from the YouTube Data API.
+         * @param {Array} videos Array of video objects from the YouTube API.
+         */
+        function displayResults(videos) {
+            resultsContainer.innerHTML = '';
+            
+            videos.forEach(video => {
+                const title = video.snippet.title;
+                const channel = video.snippet.channelTitle;
+                const videoId = video.id;
+                const duration = video.contentDetails ? parseDuration(video.contentDetails.duration) : '';
+                const thumbnailUrl = video.snippet.thumbnails.medium.url;
+                
+                const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 
-        // Optional: Allow pressing Enter in the textbox to navigate
-        urlInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                navigate();
+                const resultElement = document.createElement('div');
+                resultElement.className = 'result-card p-2 shadow-lg';
+                resultElement.onclick = () => playVideo(embedUrl, title);
+                
+                resultElement.innerHTML = `
+                    <img src="${thumbnailUrl}" alt="${title}" class="w-24 h-16 object-cover rounded-md flex-shrink-0">
+                    <div class="flex-grow p-2 overflow-hidden">
+                        <p class="font-semibold text-sm truncate text-gray-100">${title}</p>
+                        <p class="text-xs text-red-400">${channel}</p>
+                        ${duration ? `<span class="text-xs text-gray-400">Duration: ${duration}</span>` : ''}
+                    </div>
+                `;
+                
+                resultsContainer.appendChild(resultElement);
+            });
+        }
+        
+        /**
+         * Loads the selected video into the iframe player.
+         * @param {string} embedUrl The YouTube embed URL.
+         * @param {string} title The title of the video.
+         */
+        function playVideo(embedUrl, title) {
+            resultsContainer.innerHTML = ''; // Clear results to focus on player
+            videoPlayerContainer.classList.remove('hidden');
+            
+            videoTitleElement.textContent = title;
+            youtubeIframe.src = embedUrl;
+            
+            videoPlayerContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+
+
+        // --- Event Listeners ---
+        
+        searchButton.addEventListener('click', () => {
+            const query = searchQueryElement.value.trim();
+            if (query) {
+                searchYouTube(query);
             }
         });
+
+        searchQueryElement.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchButton.click();
+            }
+        });
+        
+        // Initial search on load
+        window.onload = () => {
+            searchQueryElement.value = 'r1 first impressions';
+            searchYouTube(searchQueryElement.value);
+        };
     </script>
 </body>
 </html>
