@@ -41,40 +41,27 @@
             box-shadow: 0 2px 8px rgba(255, 0, 0, 0.2);
         }
 
-        /* Specific input and button styling for compact screen */
+        /* Specific input styling for compact screen */
         #searchQuery {
-            padding: 0.5rem 0.75rem; /* Reduced padding */
-            height: 36px; /* Fixed height for consistency */
-        }
-        #searchButton {
-            width: 36px; /* Fixed width to match input height */
+            padding: 0.5rem 0.75rem;
             height: 36px;
-            padding: 0.5rem; /* Reduced padding */
         }
     </style>
 </head>
-<!-- Increased horizontal padding (px-4) to make content visually narrower and more centered -->
 <body class="px-4 py-3 min-h-screen">
-    <!-- Using w-full to fill the width allowed by the body padding -->
     <div class="w-full"> 
         <h1 class="text-xl font-bold text-center mb-3 text-red-500">
             r1 Tube <span class="text-xs font-normal text-gray-400">Official</span>
         </h1>
 
-        <!-- Search Section -->
+        <!-- Search Section - Now just the input field -->
         <div class="flex space-x-2 mb-3">
             <input 
                 type="text" 
                 id="searchQuery" 
-                placeholder="Search videos..."
+                placeholder="Search videos (press Enter)..."
                 class="flex-grow bg-gray-800 text-white text-sm rounded-lg border-2 border-red-500 focus:outline-none focus:border-red-400"
             >
-            <button 
-                id="searchButton"
-                class="bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg shadow-md transition duration-200 flex items-center justify-center"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            </button>
         </div>
 
         <!-- Warning for API Key -->
@@ -110,7 +97,6 @@
         const API_KEY = 'AIzaSyBzB8j2OwAR6-PaIqWIijmZEdkw8gmFznQ'; // <<< !!! REPLACE THIS PLACEHOLDER !!!
 
         const searchQueryElement = document.getElementById('searchQuery');
-        const searchButton = document.getElementById('searchButton');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const videoPlayerContainer = document.getElementById('videoPlayerContainer');
         const youtubeIframe = document.getElementById('youtubeIframe');
@@ -160,7 +146,7 @@
             }
 
             loadingIndicator.classList.remove('hidden');
-            searchButton.disabled = true;
+            searchQueryElement.disabled = true; // Disable input while loading
             resultsContainer.innerHTML = '';
             videoPlayerContainer.classList.add('hidden');
             
@@ -194,7 +180,7 @@
                 resultsContainer.innerHTML = `<p class="text-center text-red-400 text-xs">Error: ${error.message}. Check your API Key and network connection.</p>`;
             } finally {
                 loadingIndicator.classList.add('hidden');
-                searchButton.disabled = false;
+                searchQueryElement.disabled = false; // Re-enable input
             }
         }
 
@@ -248,19 +234,15 @@
         }
 
 
-        // --- Event Listeners ---
+        // --- Event Listener: Only keypress (Enter) is used for search ---
         
-        searchButton.addEventListener('click', () => {
-            const query = searchQueryElement.value.trim();
-            if (query) {
-                searchYouTube(query);
-            }
-        });
-
         searchQueryElement.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                searchButton.click();
+                const query = searchQueryElement.value.trim();
+                if (query) {
+                    searchYouTube(query);
+                }
             }
         });
         
