@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Browser</title>
-    <script src="/sdk/r1-creation-sdk.js"></script>
+    <title>r1 Simple Web Navigator</title>
     <style>
         body {
             display: flex;
@@ -16,38 +15,67 @@
             background-color: #000;
             color: #fff;
             font-family: sans-serif;
-            text-align: center;
+            padding: 10px;
+            box-sizing: border-box;
         }
-        button {
-            padding: 20px;
-            font-size: 1.5rem;
-            background-color: #ff6600; /* Signature rabbit orange */
+        h1 {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+        #urlForm {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 0 10px;
+        }
+        #urlInput {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ff6600;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+        }
+        #goButton {
+            padding: 12px;
+            background-color: #ff6600;
             color: #000;
             border: none;
-            border-radius: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             transition: background-color 0.2s;
         }
-        button:active {
+        #goButton:active {
             background-color: #e65c00;
         }
     </style>
 </head>
 <body>
-    <h1>r1 Mini-Browser</h1>
-    <p>Tap to start a web search.</p>
-    <button id="browserButton">Search & Summarize</button>
+    <h1>Simple URL Navigator</h1>
+    <form id="urlForm">
+        <input type="text" id="urlInput" placeholder="Enter a full URL (e.g., https://example.com)" required>
+        <button type="submit" id="goButton">Go</button>
+    </form>
 
     <script>
-        document.getElementById('browserButton').addEventListener('click', () => {
-            // This is the core instruction sent to the Large Action Model (LAM)
-            // It triggers a natural language action on the device.
-            r1.createAction({
-                intent: 'web_search_and_summarize',
-                prompt: 'Please search the web for the current top news headlines and provide a brief summary of the top three articles.',
-                display: 'GenerativeUI' // Use the r1's built-in generative UI for the results
-            });
+        document.getElementById('urlForm').addEventListener('submit', function(event) {
+            // Prevent the default form submission (which reloads the page)
+            event.preventDefault();
+
+            // Get the user's input
+            let url = document.getElementById('urlInput').value.trim();
+
+            // Basic check to ensure the URL has a protocol for proper loading
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+
+            // The core "browser" action: redirect the current window to the new URL.
+            // When run inside the r1 Creation environment, this tells the built-in browser component to navigate.
+            window.location.href = url;
         });
     </script>
 </body>
