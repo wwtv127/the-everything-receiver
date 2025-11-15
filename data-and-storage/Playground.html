@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rabbit R1 Keycode Detector</title>
+    <title>Rabbit R1 SDK Interface Detector</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -14,6 +14,7 @@
         }
         .status-box {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            transition: all 0.1s ease-in-out;
         }
     </style>
 </head>
@@ -21,10 +22,10 @@
 
     <div class="max-w-4xl w-full">
         <h1 class="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-800">
-            R1 Keycode Detector & Debugger
+            R1 SDK Interface Detector
         </h1>
         <p class="text-center mb-8 text-gray-600">
-            Use this tool on your R1 to find the **exact keycodes** the physical buttons send.
+            This tool tests for custom events exposed by the RabbitOS Creations SDK.
         </p>
 
         <!-- Instructions Panel -->
@@ -32,96 +33,111 @@
             <h2 class="text-xl font-semibold mb-3 text-red-500">How to Use:</h2>
             <ul class="list-disc list-inside space-y-2 text-gray-700">
                 <li>Load this page on your Rabbit R1.</li>
-                <li>**Press and Hold PTT:** Note the codes that appear in the Status section.</li>
-                <li>**Press Action Button:** Note the codes that appear.</li>
-                <li>**Move Scroll Wheel:** Note the codes that appear.</li>
-                <li><strong class="text-red-700">The `event.code` is the value you need for your final game logic!</strong></li>
+                <li>**Press PTT or Action:** Look for changes in the **"Custom Events (PTT/Action)"** area.</li>
+                <li>**Move Scroll Wheel:** Look for changes in the **"Scroll Wheel Debugger"** area.</li>
+                <li>If an API exists, it will reveal the correct event type or method name!</li>
             </ul>
         </div>
 
+        <!-- Custom Events (PTT/Action) Debug Area -->
+        <div id="customDebug" class="status-box bg-white p-6 rounded-xl shadow-lg mb-6 border-l-4 border-blue-500">
+            <p class="text-xs font-medium text-blue-500 uppercase">Custom Events (PTT / Action)</p>
+            <h3 class="text-2xl font-bold mt-1 text-gray-800 mb-2">Last Custom Button Event</h3>
+            <p id="customOutput" class="text-lg font-mono text-gray-700">--- Waiting for custom event (r1_button_press) ---</p>
+            <p class="text-xs mt-2 text-gray-400">If this changes, we found the right event name!</p>
+        </div>
+        
         <!-- Scroll Debug Area -->
         <div id="scrollDebug" class="status-box bg-white p-6 rounded-xl shadow-lg mb-6 border-l-4 border-yellow-500">
-            <p class="text-xs font-medium text-yellow-500 uppercase">Scroll Wheel Debugger</p>
+            <p class="text-xs font-medium text-yellow-500 uppercase">Standard Wheel Event Check</p>
             <h3 class="text-2xl font-bold mt-1 text-gray-800 mb-2">Last Scroll Direction</h3>
-            <p id="scrollOutput" class="text-lg font-mono text-gray-700">--- Waiting for scroll event ---</p>
+            <p id="scrollOutput" class="text-lg font-mono text-gray-700">--- Waiting for wheel event ---</p>
         </div>
 
-        <!-- Keypress Debug Area -->
-        <div id="keypressDebug" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
-            <p class="text-xs font-medium text-blue-500 uppercase">Keypress Detector (PTT / Action Buttons)</p>
+        <!-- Keypress Debug Area (Fallback/Touch Keyboard) -->
+        <div id="keypressDebug" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-500">
+            <p class="text-xs font-medium text-red-500 uppercase">Keypress Detector (For Touch Keyboard)</p>
             <h3 class="text-2xl font-bold mt-1 text-gray-800 mb-2">Last Keydown Event</h3>
-            <div class="grid grid-cols-3 gap-4 text-sm font-mono text-gray-700 mb-4">
-                <div><span class="font-bold text-blue-600">Key:</span> <span id="keyVal">N/A</span></div>
-                <div><span class="font-bold text-blue-600">Code:</span> <span id="codeVal">N/A</span></div>
-                <div><span class="font-bold text-blue-600">KeyCode:</span> <span id="keyCodeVal">N/A</span></div>
-            </div>
-
-            <h3 class="text-xl font-bold text-gray-800 mb-2">Keypress History</h3>
-            <div id="history" class="h-32 overflow-y-scroll bg-gray-100 p-2 rounded text-xs font-mono">
-                <p class="text-gray-500">Press a button to see history...</p>
-            </div>
+            <p id="codeVal" class="text-lg font-mono text-gray-700">N/A</p>
         </div>
     </div>
 
     <script>
         // DOM Elements
         const scrollOutput = document.getElementById('scrollOutput');
-        const keyVal = document.getElementById('keyVal');
+        const customOutput = document.getElementById('customOutput');
         const codeVal = document.getElementById('codeVal');
-        const keyCodeVal = document.getElementById('keyCodeVal');
-        const historyEl = document.getElementById('history');
 
-        // --- Utility Functions ---
-
-        function updateHistory(type, key, code) {
-            const time = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('p');
-            logEntry.className = (type === 'keydown' ? 'text-red-700' : 'text-green-700');
-            logEntry.textContent = `[${time}] ${type.toUpperCase()}: Key=${key}, Code=${code}`;
+        // --- Custom Event Listener ---
+        
+        // This is a common pattern for embedded SDKs to expose hardware.
+        // We will listen for a hypothetical custom event named 'r1_button_press' or 'rabbit_input'.
+        // If the R1 uses an SDK, it will dispatch an event that we can capture here.
+        
+        function handleCustomButton(event) {
+            console.log('Custom button event received:', event.detail);
+            const detail = event.detail || {};
             
-            // Add to the top of the history list
-            if (historyEl.firstChild && historyEl.firstChild.tagName === 'P' && historyEl.firstChild.textContent.includes('Press a button')) {
-                 historyEl.removeChild(historyEl.firstChild); // Remove placeholder
-            }
-            historyEl.prepend(logEntry);
+            // Check for common R1 button identifiers
+            const button = detail.button || 'Unknown';
+            const state = detail.state || 'Unknown';
 
-            // Limit history to 15 entries
-            if (historyEl.children.length > 15) {
-                historyEl.removeChild(historyEl.lastChild);
-            }
+            customOutput.textContent = `BUTTON: ${button} | STATE: ${state} | RAW DATA: ${JSON.stringify(detail)}`;
+            customOutput.className = 'text-lg font-mono text-green-700';
+
+            const customBox = document.getElementById('customDebug');
+            customBox.style.backgroundColor = '#d4edda'; // Green transient color
+            
+            clearTimeout(customBox.timer);
+            customBox.timer = setTimeout(() => {
+                customBox.style.backgroundColor = '#ffffff';
+            }, 300);
         }
 
-        function handleScroll(event) {
-            event.preventDefault(); // Prevent page scroll
-            const direction = event.deltaY < 0 ? 'SCROLL UP' : 'SCROLL DOWN';
+        // We check for several common custom event names used in similar platforms
+        window.addEventListener('r1_button_press', handleCustomButton, false);
+        window.addEventListener('rabbit_input', handleCustomButton, false);
+        window.addEventListener('hardware_input', handleCustomButton, false);
+
+
+        // --- Standard Event Listeners (For Scroll Wheel and Touch Keyboard) ---
+
+        function handleStandardKey(event) {
+            // Note: We are ignoring physical buttons here as they are blocked. 
+            // This is just to confirm if the touch keyboard works.
+            codeVal.textContent = event.code;
+            const keyBox = document.getElementById('keypressDebug');
+            keyBox.style.backgroundColor = '#f8d7da'; // Red transient color
+            
+            clearTimeout(keyBox.timer);
+            keyBox.timer = setTimeout(() => {
+                keyBox.style.backgroundColor = '#ffffff';
+            }, 100);
+        }
+
+        function handleStandardScroll(event) {
+            // Check if the scroll wheel sends a standard wheel event
+            event.preventDefault(); 
+            const direction = event.deltaY < 0 ? 'SCROLL UP (Standard Wheel)' : 'SCROLL DOWN (Standard Wheel)';
             scrollOutput.textContent = direction;
             scrollOutput.className = `text-lg font-mono text-${event.deltaY < 0 ? 'green' : 'red'}-700`;
+            
+            const scrollBox = document.getElementById('scrollDebug');
+            scrollBox.style.backgroundColor = '#fff3cd'; // Yellow transient color
+
+            clearTimeout(scrollBox.timer);
+            scrollBox.timer = setTimeout(() => {
+                scrollBox.style.backgroundColor = '#ffffff';
+            }, 100);
         }
 
-        // --- Event Listeners ---
-
-        // Listen for all keypress events
-        document.addEventListener('keydown', (event) => {
-            event.preventDefault(); 
-            keyVal.textContent = event.key;
-            codeVal.textContent = event.code;
-            keyCodeVal.textContent = event.keyCode;
-            
-            updateHistory('keydown', event.key, event.code);
-        });
-
-        document.addEventListener('keyup', (event) => {
-            event.preventDefault();
-            updateHistory('keyup', event.key, event.code);
-        });
-
-        // Listen for standard mouse wheel (in case the R1 scroll wheel sends a standard event)
-        window.addEventListener('wheel', handleScroll, { passive: false });
+        document.addEventListener('keydown', handleStandardKey);
+        window.addEventListener('wheel', handleStandardScroll, { passive: false });
 
 
         // Initialize state on load
         window.onload = () => {
-            console.log('R1 Keycode Detector Loaded.');
+            console.log('R1 SDK Detector Loaded. Check for custom events.');
         };
     </script>
 </body>
