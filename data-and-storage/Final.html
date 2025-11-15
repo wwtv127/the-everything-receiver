@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R1 Official SDK Events</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Base styles for R1 mobile aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ff9900; /* Rabbit R1 Orange */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+        #app-container {
+            background-color: #262626; /* Dark background for content */
+            color: #ffffff;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .event-log {
+            height: 300px;
+            overflow-y: scroll;
+            background-color: #3f3f46;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            display: flex;
+            flex-direction: column-reverse; /* New entries at top */
+        }
+        .log-item {
+            border-top: 1px solid #52525b;
+            padding: 0.5rem 0;
+        }
+        .log-item:first-child {
+            border-top: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <h1 class="text-xl font-bold text-center">R1 Hardware Event Listener</h1>
+    <p class="text-sm text-center text-gray-300">Using documented `window.addEventListener` pattern.</p>
+
+    <div class="mt-4">
+        <h2 class="text-lg font-medium mb-1">Live Hardware Log</h2>
+        <div id="log" class="event-log"></div>
+    </div>
+</div>
+
+<script>
+    const logElement = document.getElementById('log');
+
+    /**
+     * Helper function to log events to the UI
+     * @param {string} message - The message to log
+     * @param {string} color - Tailwind text color class (e.g., 'text-green-400')
+     */
+    function logEvent(message, color = 'text-white') {
+        const timestamp = new Date().toLocaleTimeString();
+        const newItem = document.createElement('div');
+        newItem.className = `log-item ${color}`;
+        newItem.innerHTML = `[${timestamp}] ${message}`;
+        logElement.prepend(newItem);
+    }
+
+    // --- Official SDK Event Registration using window.addEventListener ---
+
+    // PTT / Side Button: Single click
+    window.addEventListener("sideClick", () => {
+      logEvent("PTT: Single Click (sideClick)", 'text-red-400 font-bold');
+    });
+
+    // PTT / Side Button: Long press start
+    window.addEventListener("longPressStart", () => {
+      logEvent("PTT: Long Press STARTED", 'text-yellow-400 font-bold');
+    });
+
+    // PTT / Side Button: Long press end
+    window.addEventListener("longPressEnd", () => {
+      logEvent("PTT: Long Press ENDED", 'text-green-400 font-bold');
+    });
+
+    // Scroll Wheel: Up (away from user)
+    window.addEventListener("scrollUp", () => {
+      logEvent("SCROLL WHEEL: Scrolled UP", 'text-indigo-300');
+    });
+
+    // Scroll Wheel: Down (towards user)
+    window.addEventListener("scrollDown", () => {
+      logEvent("SCROLL WHEEL: Scrolled DOWN", 'text-indigo-300');
+    });
+    
+    // --- Initialization ---
+
+    window.onload = () => {
+        logEvent('Listeners Registered. Try the PTT button and scroll wheel.', 'text-white');
+    };
+
+</script>
+</body>
+</html>
+
