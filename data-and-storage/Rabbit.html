@@ -3,79 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>r1 Simple Web Navigator</title>
+    <title>r1 Embedded Browser</title>
     <style>
+        /* Base Styles for R1 Screen */
         body {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
             height: 100vh;
             margin: 0;
             background-color: #000;
             color: #fff;
             font-family: sans-serif;
-            padding: 10px;
             box-sizing: border-box;
         }
-        h1 {
-            font-size: 1.1rem;
-            margin-bottom: 20px;
-        }
-        #urlForm {
-            width: 100%;
+        #browserHeader {
             display: flex;
-            flex-direction: column;
-            gap: 15px;
-            padding: 0 10px;
+            padding: 10px;
+            background-color: #333;
+            /* Added gap for spacing */
+            gap: 10px;
         }
         #urlInput {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ff6600;
-            border-radius: 8px;
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ff6600;
+            border-radius: 4px;
             font-size: 0.9rem;
-            box-sizing: border-box;
         }
-        #goButton {
-            padding: 12px;
+        /* Style for both buttons */
+        .headerButton {
+            padding: 8px 15px;
             background-color: #ff6600;
             color: #000;
             border: none;
-            border-radius: 8px;
-            font-size: 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
             font-weight: bold;
             cursor: pointer;
-            transition: background-color 0.2s;
+            flex-shrink: 0; /* Prevents buttons from shrinking */
         }
-        #goButton:active {
-            background-color: #e65c00;
+        #contentFrame {
+            flex-grow: 1;
+            width: 100%;
+            border: none;
+            /* Center the iframe's content when scaled */
+            transform-origin: top left;
         }
     </style>
 </head>
 <body>
-    <h1>Simple URL Navigator</h1>
-    <form id="urlForm">
-        <input type="text" id="urlInput" placeholder="Enter a full URL (e.g., https://example.com)" required>
-        <button type="submit" id="goButton">Go</button>
-    </form>
+    <div id="browserHeader">
+        <input type="text" id="urlInput" value="https://www.google.com" required>
+        <button id="goButton" class="headerButton">Go</button>
+        <button id="zoomButton" class="headerButton">Zoom Out</button>
+    </div>
+
+    <iframe id="contentFrame" src="https://www.google.com"></iframe>
 
     <script>
-        document.getElementById('urlForm').addEventListener('submit', function(event) {
-            // Prevent the default form submission (which reloads the page)
-            event.preventDefault();
+        const urlInput = document.getElementById('urlInput');
+        const goButton = document.getElementById('goButton');
+        const zoomButton = document.getElementById('zoomButton');
+        const contentFrame = document.getElementById('contentFrame');
+        
+        // Initial zoom level (1.0 = 100%)
+        let currentScale = 1.0;
+        const scaleStep = 0.2; // How much to zoom in/out with each click
+        const minScale = 0.4; // Smallest zoom level
+        const maxScale = 1.0; // Largest zoom level (default)
 
-            // Get the user's input
-            let url = document.getElementById('urlInput').value.trim();
-
-            // Basic check to ensure the URL has a protocol for proper loading
+        // Function to handle navigation
+        function navigate() {
+            let url = urlInput.value.trim();
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'https://' + url;
+                urlInput.value = url;
             }
+            contentFrame.src = url;
+        }
 
-            // The core "browser" action: redirect the current window to the new URL.
-            // When run inside the r1 Creation environment, this tells the built-in browser component to navigate.
-            window.location.href = url;
+        // Function to handle zoom
+        function adjustZoom() {
+            // Cycle the scale from 1.0 -> 0.8 -> 0.6 -> 0.4, then back to 1.0
+            if (currentScale > minScale) {
+                currentScale = Math.max(minScale, currentScale - scaleStep);
+            } else {
+                // Reset to 1.0 if already at min zoom
+                currentScale = maxScale;
+            }
+            
+            // Apply the new scale to the iframe using CSS transform
+            contentFrame.style.transform = `scale(${currentScale})`;
+
+            // Update button text to reflect next action
+            if (currentScale === maxScale) {
+                zoomButton.textContent = "Zoom Out";
+            } else {
+                zoomButton.textContent = "Zoom In";
+            }
+        }
+
+        goButton.addEventListener('click', navigate);
+        zoomButton.addEventListener('click', adjustZoom);
+
+        // Optional: Allow pressing Enter in the textbox to navigate
+        urlInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                navigate();
+            }
         });
     </script>
 </body>
