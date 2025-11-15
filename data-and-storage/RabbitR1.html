@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R1 Live SDK Event Handlers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for R1 mobile aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ff9900; /* Rabbit R1 Orange */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+        #app-container {
+            background-color: #262626; /* Dark background for content */
+            color: #ffffff;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .event-log {
+            height: 300px;
+            overflow-y: scroll;
+            background-color: #3f3f46;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            line-height: 1.25;
+            white-space: pre-wrap;
+            display: flex;
+            flex-direction: column-reverse; /* New entries at top */
+        }
+        .log-item {
+            border-top: 1px solid #52525b;
+            padding: 0.5rem 0;
+        }
+        .log-item:first-child {
+            border-top: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <h1 class="text-xl font-bold text-center">R1 Live SDK Event Listener</h1>
+    <p class="text-sm text-center text-gray-300">Interact with the physical PTT button and scroll wheel on your device.</p>
+
+    <!-- Simple Button to confirm normal touch events work -->
+    <button id="test-button" class="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition duration-150 ease-in-out active:scale-95">
+        Test Normal Touch Event
+    </button>
+
+    <div class="mt-4">
+        <h2 class="text-lg font-medium mb-1">Device Input Log</h2>
+        <div id="log" class="event-log"></div>
+    </div>
+</div>
+
+<script>
+    const logElement = document.getElementById('log');
+
+    /**
+     * Helper function to log events to the UI
+     * @param {string} message - The message to log
+     * @param {string} color - Tailwind text color class (e.g., 'text-green-400')
+     */
+    function logEvent(message, color = 'text-white') {
+        const timestamp = new Date().toLocaleTimeString();
+        const newItem = document.createElement('div');
+        newItem.className = `log-item ${color}`;
+        newItem.innerHTML = `[${timestamp}] ${message}`;
+        logElement.prepend(newItem);
+    }
+
+    // --- Core SDK Interaction ---
+    
+    // Check if the rabbit SDK object is available
+    if (typeof rabbit !== 'undefined' && rabbit.onPTTButtonPress) {
+        
+        logEvent("R1 SDK Detected. Registering listeners...", 'text-yellow-400');
+
+        // 1. PTT Button Press Event
+        rabbit.onPTTButtonPress(() => {
+            logEvent('PTT PRESSED: Start Voice Input / Action', 'text-red-400 font-bold');
+            // Add your custom logic here, e.g., start recording, change UI state
+        });
+
+        // 2. PTT Button Release Event
+        rabbit.onPTTButtonRelease(() => {
+            logEvent('PTT RELEASED: Stop Voice Input / Action', 'text-green-400 font-bold');
+            // Add your custom logic here, e.g., process audio, reset UI state
+        });
+
+        // 3. Scroll Wheel Event
+        rabbit.onScrollWheelScroll((delta) => {
+            const direction = delta > 0 ? 'UP' : 'DOWN';
+            logEvent(`SCROLL WHEEL: Scrolled ${direction} (Delta: ${delta})`, 'text-indigo-300');
+            
+            // Example custom logic: use scroll for navigation or value adjustment
+            if (delta > 0) {
+                // Scroll up logic
+            } else if (delta < 0) {
+                // Scroll down logic
+            }
+        });
+
+    } else {
+        logEvent("R1 SDK not detected. Events will not fire until deployed on a Rabbit R1.", 'text-red-400');
+    }
+
+    // --- Standard Touch/Click Event (for testing regular UI) ---
+    document.getElementById('test-button').addEventListener('click', () => {
+        logEvent('NORMAL BUTTON CLICK: Touch event registered.', 'text-gray-400');
+    });
+
+    window.onload = () => {
+        logEvent('App Initialized. Try the R1 hardware controls.', 'text-white');
+    };
+
+</script>
+</body>
+</html>
+
