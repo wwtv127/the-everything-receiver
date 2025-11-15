@@ -15,27 +15,26 @@
             transition: all 0.15s ease-in-out;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
-        .active-button {
-            /* This class is now primarily used for status box feedback */
-            box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.5); /* Glowing effect */
-        }
     </style>
 </head>
 <body class="p-4 sm:p-8 flex flex-col items-center justify-center min-h-screen">
 
     <div class="max-w-4xl w-full">
         <h1 class="text-3xl sm:text-4xl font-bold text-center mb-8 text-gray-800">
-            Rabbit R1 Control Playground
+            Rabbit R1 Control Playground (Physical Simulation)
         </h1>
 
         <!-- Instructions Panel -->
         <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h2 class="text-xl font-semibold mb-3 text-red-500">How to Simulate:</h2>
+            <h2 class="text-xl font-semibold mb-3 text-red-500">How to Simulate (Keyboard/Mouse):</h2>
             <ul class="list-disc list-inside space-y-2 text-gray-600">
                 <li>**Scroll Wheel:** Use your physical mouse wheel (or trackpad scroll).</li>
                 <li>**Side Button 1 (PTT):** Hold down the **SPACEBAR** key.</li>
                 <li>**Side Button 2 (Action):** Press the **ENTER** key.</li>
             </ul>
+             <p class="mt-4 text-xs italic text-gray-400">
+                This version simulates the expected keypress/scroll events that the R1's physical hardware would likely map to in a browser environment.
+            </p>
         </div>
 
         <!-- Status Displays Container -->
@@ -43,7 +42,7 @@
 
             <!-- 1. Scroll Wheel Status -->
             <div id="scrollStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-500">
-                <p class="text-xs font-medium text-yellow-500 uppercase">Input</p>
+                <p class="text-xs font-medium text-yellow-500 uppercase">Hardware Input</p>
                 <h3 class="text-2xl font-bold mt-1 text-gray-800">Scroll Wheel</h3>
                 <p class="text-sm mt-3 text-gray-500">
                     <span id="scrollDirection" class="font-semibold text-gray-700">Waiting for scroll...</span>
@@ -53,22 +52,22 @@
 
             <!-- 2. PTT/Side Button 1 Status -->
             <div id="pttStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-500">
-                <p class="text-xs font-medium text-red-500 uppercase">Input: Keyboard Only</p>
+                <p class="text-xs font-medium text-red-500 uppercase">Hardware Input (Simulated by SPACEBAR)</p>
                 <h3 class="text-2xl font-bold mt-1 text-gray-800">Side Button 1 (PTT)</h3>
                 <p id="pttState" class="text-sm mt-3 font-semibold text-gray-700">Released</p>
-                <p class="text-xs mt-2 text-gray-400">Key: SPACEBAR</p>
+                <p class="text-xs mt-2 text-gray-400">Status: Key Down/Key Up</p>
             </div>
 
             <!-- 3. Action/Side Button 2 Status -->
             <div id="actionStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
-                <p class="text-xs font-medium text-blue-500 uppercase">Input: Keyboard Only</p>
+                <p class="text-xs font-medium text-blue-500 uppercase">Hardware Input (Simulated by ENTER)</p>
                 <h3 class="text-2xl font-bold mt-1 text-gray-800">Side Button 2 (Action)</h3>
                 <p id="actionState" class="text-sm mt-3 font-semibold text-gray-700">Released</p>
-                <p class="text-xs mt-2 text-gray-400">Key: ENTER</p>
+                <p class="text-xs mt-2 text-gray-400">Status: Key Down/Key Up</p>
             </div>
         </div>
         
-        <!-- Removed virtual buttons section -->
+        <!-- Virtual Buttons for Touch/Click removed -->
 
     </div>
 
@@ -97,10 +96,12 @@
 
             if (isPressed) {
                 pttState.textContent = 'PRESSED (Listening...)';
+                // Highlight PTT status box
                 pttStatus.classList.add('bg-red-100', 'border-red-600');
                 pttStatus.classList.remove('bg-white', 'border-red-500');
             } else {
                 pttState.textContent = 'Released';
+                // Reset PTT status box
                 pttStatus.classList.add('bg-white', 'border-red-500');
                 pttStatus.classList.remove('bg-red-100', 'border-red-600');
             }
@@ -116,10 +117,12 @@
 
             if (isPressed) {
                 actionState.textContent = 'PRESSED (Executing Action...)';
+                // Highlight Action status box
                 actionStatus.classList.add('bg-blue-100', 'border-blue-600');
                 actionStatus.classList.remove('bg-white', 'border-blue-500');
             } else {
                 actionState.textContent = 'Released';
+                // Reset Action status box
                 actionStatus.classList.add('bg-white', 'border-blue-500');
                 actionStatus.classList.remove('bg-blue-100', 'border-blue-600');
             }
@@ -141,7 +144,7 @@
 
             // Simple visual feedback for scroll
             const scrollBox = document.getElementById('scrollStatus');
-            scrollBox.style.backgroundColor = event.deltaY > 0 ? '#fff3cd' : '#d4edda';
+            scrollBox.style.backgroundColor = event.deltaY > 0 ? '#fff3cd' : '#d4edda'; // Yellow/Green transient color
             scrollBox.style.borderColor = event.deltaY > 0 ? '#ffc107' : '#28a745';
 
             // Reset background color after a short delay
@@ -179,9 +182,10 @@
             }
         });
 
+
         // Initialize state on load
         window.onload = () => {
-            console.log('R1 Simulator Loaded. Try scrolling and pressing SPACE/ENTER.');
+            console.log('R1 Simulator Loaded. Inputs: Mouse Wheel, SPACEBAR, ENTER.');
         };
 
     </script>
