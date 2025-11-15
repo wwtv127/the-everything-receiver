@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R1 Minimal SDK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ff9900;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+        #app-container {
+            background-color: #262626;
+            color: #ffffff;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+        .log {
+            min-height: 200px;
+            background-color: #3f3f46;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container" class="flex flex-col gap-4">
+    <h1 class="text-xl font-bold text-center">R1 Hardware Listener (Minimal)</h1>
+    <p class="text-sm text-center text-gray-300">Test PTT and Scroll Wheel</p>
+    
+    <div id="status-log" class="log flex flex-col justify-end">
+        <div id="status-message" class="text-lg text-center font-semibold text-white">Loading...</div>
+    </div>
+</div>
+
+<script>
+    const statusMessage = document.getElementById('status-message');
+
+    /**
+     * Updates the status message on the screen.
+     * @param {string} msg - The message to display.
+     * @param {string} colorClass - Tailwind color class for styling.
+     */
+    function updateStatus(msg, colorClass) {
+        statusMessage.textContent = msg;
+        statusMessage.className = `text-lg text-center font-semibold ${colorClass}`;
+    }
+
+    /**
+     * Initializes the SDK listeners.
+     */
+    function initializeR1Sdk() {
+        if (typeof rabbit !== 'undefined' && rabbit.onPTTButtonPress) {
+            updateStatus("SDK READY. Try controls.", 'text-green-400');
+
+            // 1. PTT Button Press
+            rabbit.onPTTButtonPress(() => {
+                updateStatus('PTT PRESSED: Voice Action Triggered!', 'text-red-400 font-bold');
+            });
+
+            // 2. PTT Button Release
+            rabbit.onPTTButtonRelease(() => {
+                updateStatus('PTT RELEASED: Action Ended.', 'text-yellow-400 font-bold');
+            });
+
+            // 3. Scroll Wheel
+            rabbit.onScrollWheelScroll((delta) => {
+                const direction = delta > 0 ? 'SCROLL UP' : 'SCROLL DOWN';
+                updateStatus(`${direction} (Delta: ${delta})`, 'text-indigo-300');
+            });
+
+        } else {
+            // Fallback if the SDK object is not yet available
+            updateStatus("Rabbit SDK object missing. Cannot register handlers.", 'text-red-400');
+        }
+    }
+
+    // Attempt initialization on page load
+    window.onload = initializeR1Sdk;
+
+</script>
+</body>
+</html>
+
