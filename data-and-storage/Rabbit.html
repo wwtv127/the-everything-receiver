@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Browser</title>
+    <script src="/sdk/r1-creation-sdk.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+        }
+        button {
+            padding: 20px;
+            font-size: 1.5rem;
+            background-color: #ff6600; /* Signature rabbit orange */
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.2s;
+        }
+        button:active {
+            background-color: #e65c00;
+        }
+    </style>
+</head>
+<body>
+    <h1>r1 Mini-Browser</h1>
+    <p>Tap to start a web search.</p>
+    <button id="browserButton">Search & Summarize</button>
+
+    <script>
+        document.getElementById('browserButton').addEventListener('click', () => {
+            // This is the core instruction sent to the Large Action Model (LAM)
+            // It triggers a natural language action on the device.
+            r1.createAction({
+                intent: 'web_search_and_summarize',
+                prompt: 'Please search the web for the current top news headlines and provide a brief summary of the top three articles.',
+                display: 'GenerativeUI' // Use the r1's built-in generative UI for the results
+            });
+        });
+    </script>
+</body>
+</html>
