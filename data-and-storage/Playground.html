@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rabbit R1 Control Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light gray background */
+        }
+        .status-box {
+            transition: all 0.15s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .active-button {
+            /* This class is now primarily used for status box feedback */
+            box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.5); /* Glowing effect */
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex flex-col items-center justify-center min-h-screen">
+
+    <div class="max-w-4xl w-full">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center mb-8 text-gray-800">
+            Rabbit R1 Control Playground
+        </h1>
+
+        <!-- Instructions Panel -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-3 text-red-500">How to Simulate:</h2>
+            <ul class="list-disc list-inside space-y-2 text-gray-600">
+                <li>**Scroll Wheel:** Use your physical mouse wheel (or trackpad scroll).</li>
+                <li>**Side Button 1 (PTT):** Hold down the **SPACEBAR** key.</li>
+                <li>**Side Button 2 (Action):** Press the **ENTER** key.</li>
+            </ul>
+        </div>
+
+        <!-- Status Displays Container -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+            <!-- 1. Scroll Wheel Status -->
+            <div id="scrollStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-500">
+                <p class="text-xs font-medium text-yellow-500 uppercase">Input</p>
+                <h3 class="text-2xl font-bold mt-1 text-gray-800">Scroll Wheel</h3>
+                <p class="text-sm mt-3 text-gray-500">
+                    <span id="scrollDirection" class="font-semibold text-gray-700">Waiting for scroll...</span>
+                </p>
+                <p class="text-xs mt-2 text-gray-400">Total Scrolls: <span id="scrollCount">0</span></p>
+            </div>
+
+            <!-- 2. PTT/Side Button 1 Status -->
+            <div id="pttStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-500">
+                <p class="text-xs font-medium text-red-500 uppercase">Input: Keyboard Only</p>
+                <h3 class="text-2xl font-bold mt-1 text-gray-800">Side Button 1 (PTT)</h3>
+                <p id="pttState" class="text-sm mt-3 font-semibold text-gray-700">Released</p>
+                <p class="text-xs mt-2 text-gray-400">Key: SPACEBAR</p>
+            </div>
+
+            <!-- 3. Action/Side Button 2 Status -->
+            <div id="actionStatus" class="status-box bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
+                <p class="text-xs font-medium text-blue-500 uppercase">Input: Keyboard Only</p>
+                <h3 class="text-2xl font-bold mt-1 text-gray-800">Side Button 2 (Action)</h3>
+                <p id="actionState" class="text-sm mt-3 font-semibold text-gray-700">Released</p>
+                <p class="text-xs mt-2 text-gray-400">Key: ENTER</p>
+            </div>
+        </div>
+        
+        <!-- Removed virtual buttons section -->
+
+    </div>
+
+    <script>
+        // DOM Elements
+        const pttStatus = document.getElementById('pttStatus');
+        const pttState = document.getElementById('pttState');
+        const actionStatus = document.getElementById('actionStatus');
+        const actionState = document.getElementById('actionState');
+        const scrollDirection = document.getElementById('scrollDirection');
+        const scrollCountEl = document.getElementById('scrollCount');
+
+        let scrollCounter = 0;
+        let pttPressed = false;
+        let actionPressed = false;
+
+        // --- Utility Functions ---
+
+        /**
+         * Updates the UI status for the PTT (Side Button 1).
+         * @param {boolean} isPressed - true if button is down, false if released.
+         */
+        function updatePttState(isPressed) {
+            if (pttPressed === isPressed) return;
+            pttPressed = isPressed;
+
+            if (isPressed) {
+                pttState.textContent = 'PRESSED (Listening...)';
+                pttStatus.classList.add('bg-red-100', 'border-red-600');
+                pttStatus.classList.remove('bg-white', 'border-red-500');
+            } else {
+                pttState.textContent = 'Released';
+                pttStatus.classList.add('bg-white', 'border-red-500');
+                pttStatus.classList.remove('bg-red-100', 'border-red-600');
+            }
+        }
+
+        /**
+         * Updates the UI status for the Action (Side Button 2).
+         * @param {boolean} isPressed - true if button is down, false if released.
+         */
+        function updateActionState(isPressed) {
+            if (actionPressed === isPressed) return;
+            actionPressed = isPressed;
+
+            if (isPressed) {
+                actionState.textContent = 'PRESSED (Executing Action...)';
+                actionStatus.classList.add('bg-blue-100', 'border-blue-600');
+                actionStatus.classList.remove('bg-white', 'border-blue-500');
+            } else {
+                actionState.textContent = 'Released';
+                actionStatus.classList.add('bg-white', 'border-blue-500');
+                actionStatus.classList.remove('bg-blue-100', 'border-blue-600');
+            }
+        }
+
+        /**
+         * Handles the scroll wheel event.
+         * @param {WheelEvent} event
+         */
+        function handleScroll(event) {
+            // Prevent the whole page from scrolling if the user is testing the scroll wheel
+            event.preventDefault(); 
+            
+            scrollCounter++;
+            scrollCountEl.textContent = scrollCounter;
+
+            const direction = event.deltaY > 0 ? 'Down (Forward/Next)' : 'Up (Backward/Previous)';
+            scrollDirection.textContent = direction;
+
+            // Simple visual feedback for scroll
+            const scrollBox = document.getElementById('scrollStatus');
+            scrollBox.style.backgroundColor = event.deltaY > 0 ? '#fff3cd' : '#d4edda';
+            scrollBox.style.borderColor = event.deltaY > 0 ? '#ffc107' : '#28a745';
+
+            // Reset background color after a short delay
+            clearTimeout(scrollBox.timer);
+            scrollBox.timer = setTimeout(() => {
+                scrollBox.style.backgroundColor = '#ffffff';
+                scrollBox.style.borderColor = '#fbbf24'; // Tailwind yellow-500
+            }, 100);
+        }
+
+        // --- Event Listeners ---
+
+        // 1. Scroll Wheel Listener (on the whole window to capture all scrolls)
+        window.addEventListener('wheel', handleScroll, { passive: false });
+
+
+        // 2. Keyboard Listeners (Spacebar for PTT, Enter for Action)
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                event.preventDefault(); // Prevent page scroll when space is pressed
+                updatePttState(true);
+            } else if (event.code === 'Enter') {
+                event.preventDefault(); // Prevent form submission
+                updateActionState(true);
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.code === 'Space') {
+                event.preventDefault();
+                updatePttState(false);
+            } else if (event.code === 'Enter') {
+                event.preventDefault();
+                updateActionState(false);
+            }
+        });
+
+        // Initialize state on load
+        window.onload = () => {
+            console.log('R1 Simulator Loaded. Try scrolling and pressing SPACE/ENTER.');
+        };
+
+    </script>
+</body>
+</html>
