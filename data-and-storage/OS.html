@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmegaOS Ultimate</title>
+    <style>
+        :root {
+            --primary-color: #0078d7;
+            --bg-color: #333;
+            --taskbar-height: 45px;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            background-color: #000;
+        }
+
+        /* --- BOOT SCREEN --- */
+        #boot-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        .loader {
+            border: 4px solid #333;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- SETUP SCREEN --- */
+        #setup-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+        }
+        .setup-box {
+            background: rgba(0,0,0,0.7);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 15px 25px rgba(0,0,0,0.5);
+        }
+        .setup-box input {
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            width: 200px;
+            margin-top: 10px;
+        }
+        .setup-box button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        /* --- DESKTOP --- */
+        #desktop {
+            width: 100%;
+            height: calc(100% - var(--taskbar-height));
+            background: url('https://images.unsplash.com/photo-1477346611705-65d1883cee1e?auto=format&fit=crop&w=1920&q=80') no-repeat center center/cover;
+            position: relative;
+            display: none;
+        }
+
+        /* Desktop Icons */
+        .desktop-icon {
+            width: 80px;
+            text-align: center;
+            color: white;
+            margin: 20px;
+            cursor: pointer;
+            display: inline-block;
+            vertical-align: top;
+            text-shadow: 1px 1px 3px black;
+            transition: 0.2s;
+        }
+        .desktop-icon img {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 5px;
+        }
+        .desktop-icon:hover {
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            transform: scale(1.05);
+        }
+
+        /* --- WINDOWS --- */
+        .window {
+            position: absolute;
+            background: #f0f0f0;
+            border-radius: 6px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 200px;
+            min-height: 200px;
+            resize: both;
+        }
+        
+        /* IMPORTANT: This class is added during dragging to prevent iframes from stealing mouse events */
+        body.dragging-mode iframe {
+            pointer-events: none;
+        }
+
+        .title-bar {
+            background: #e0e0e0;
+            padding: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: default;
+            user-select: none;
+            border-bottom: 1px solid #ccc;
+        }
+        .title-drag-area {
+            flex-grow: 1;
+            height: 100%;
+            cursor: grab;
+            font-weight: bold;
+            padding-left: 5px;
+        }
+        .title-bar-controls button {
+            border: none;
+            background: transparent;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 3px;
+        }
+        .close-btn:hover { background: #e81123; color: white; }
+        .min-btn:hover { background: #ccc; }
+        
+        .window-content {
+            flex: 1;
+            background: white;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- CALCULATOR STYLES --- */
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            padding: 10px;
+            height: 100%;
+            background: #f3f3f3;
+        }
+        .calc-display {
+            grid-column: span 4;
+            background: #fff;
+            border: 1px solid #ccc;
+            text-align: right;
+            padding: 15px;
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
+        .calc-btn {
+            border: 1px solid #ccc;
+            background: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.1s;
+        }
+        .calc-btn:hover { background: #e6e6e6; }
+        .calc-btn:active { background: #ccc; }
+        .calc-btn.operator { background: #f0f0f0; color: var(--primary-color); }
+        .calc-btn.equals { background: var(--primary-color); color: white; }
+
+        /* --- BROWSER STYLES --- */
+        .browser-bar {
+            display: flex;
+            padding: 5px;
+            background: #eee;
+            border-bottom: 1px solid #ccc;
+        }
+        .browser-bar input {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+        .browser-bar button {
+            padding: 5px 15px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        iframe.browser-frame {
+            flex: 1;
+            width: 100%;
+            border: none;
+        }
+
+        /* --- NOTEPAD & FILE EXPLORER --- */
+        textarea.notepad-area {
+            width: 100%;
+            height: 100%;
+            border: none;
+            resize: none;
+            font-family: monospace;
+            padding: 10px;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            padding: 10px;
+        }
+        .file-item {
+            text-align: center;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .file-item:hover { background: #e0efff; border: 1px solid #cceeff; }
+        .file-icon { font-size: 2rem; display: block; margin-bottom: 5px; }
+
+        /* --- TASKBAR --- */
+        #taskbar {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: var(--taskbar-height);
+            background: rgba(20, 20, 20, 0.9);
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            z-index: 9990;
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #444;
+        }
+        #start-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 0 15px;
+            height: 100%;
+            margin-right: 5px;
+            transition: 0.2s;
+        }
+        #start-btn:hover { background: rgba(255,255,255,0.1); color: var(--primary-color);}
+        
+        .task-item {
+            color: #ddd;
+            padding: 5px 15px;
+            margin: 0 2px;
+            background: rgba(255,255,255,0.05);
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 0.9rem;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        .task-item:hover { background: rgba(255,255,255,0.1); }
+        .task-item.active { background: rgba(255,255,255,0.15); border-bottom: 2px solid var(--primary-color); }
+
+        #clock {
+            margin-left: auto;
+            color: white;
+            font-size: 0.9rem;
+            padding-right: 20px;
+        }
+
+        /* --- START MENU --- */
+        #start-menu {
+            position: absolute;
+            bottom: var(--taskbar-height);
+            left: 0;
+            width: 250px;
+            background: rgba(30, 30, 30, 0.95);
+            color: white;
+            padding: 10px;
+            display: none;
+            z-index: 9991;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            border-top-right-radius: 8px;
+            border: 1px solid #444;
+        }
+        .start-item {
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+        .start-item:hover { background: rgba(255,255,255,0.1); }
+        .user-profile {
+            border-bottom: 1px solid #555;
+            padding: 10px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BOOT SCREEN -->
+    <div id="boot-screen">
+        <div class="loader"></div>
+        <h2>OmegaOS</h2>
+        <p>Starting Services...</p>
+    </div>
+
+    <!-- SETUP SCREEN -->
+    <div id="setup-screen">
+        <div class="setup-box">
+            <h2>Welcome to OmegaOS</h2>
+            <p>Create your user profile</p>
+            <input type="text" id="username-input" placeholder="Who's using this PC?">
+            <br>
+            <button onclick="completeSetup()">Get Started</button>
+        </div>
+    </div>
+
+    <!-- DESKTOP -->
+    <div id="desktop">
+        <div class="desktop-icon" onclick="openApp('notepad')">
+            <img src="https://img.icons8.com/color/96/000000/notepad.png" alt="Notepad">
+            <div>Notepad</div>
+        </div>
+        <div class="desktop-icon" onclick="openApp('browser')">
+            <img src="https://img.icons8.com/color/96/000000/internet-explorer.png" alt="Browser">
+            <div>Browser</div>
+        </div>
+        <div class="desktop-icon" onclick="openApp('explorer')">
+            <img src="https://img.icons8.com/color/96/000000/folder-invoices.png" alt="Explorer">
+            <div>Files</div>
+        </div>
+        <div class="desktop-icon" onclick="openApp('calculator')">
+            <img src="https://img.icons8.com/color/96/000000/calculator.png" alt="Calc">
+            <div>Calc</div>
+        </div>
+
+        <!-- Start Menu -->
+        <div id="start-menu">
+            <div class="user-profile" id="start-user">Guest</div>
+            <div class="start-item" onclick="openApp('notepad')">📝 Notepad</div>
+            <div class="start-item" onclick="openApp('browser')">🌐 Web Browser</div>
+            <div class="start-item" onclick="openApp('explorer')">📁 File Explorer</div>
+            <div class="start-item" onclick="openApp('calculator')">🧮 Calculator</div>
+            <div style="height:1px; background:#555; margin:5px 0;"></div>
+            <div class="start-item" onclick="location.reload()">🔌 Shut Down</div>
+        </div>
+    </div>
+
+    <!-- TASKBAR -->
+    <div id="taskbar">
+        <button id="start-btn" onclick="toggleStartMenu()">❖</button>
+        <div id="task-list" style="display:flex; flex:1;"></div>
+        <div id="clock">12:00 PM</div>
+    </div>
+
+    <script>
+        /* --- SYSTEM VARIABLES --- */
+        let zIndexCounter = 100;
+        let currentUser = "User";
+
+        /* --- BOOT LOGIC --- */
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('boot-screen').style.display = 'none';
+                checkFirstRun();
+            }, 2000);
+            
+            updateClock();
+            setInterval(updateClock, 1000);
+        };
+
+        function checkFirstRun() {
+            const savedUser = localStorage.getItem('omegaOS_user');
+            if (savedUser) {
+                currentUser = savedUser;
+                startDesktop();
+            } else {
+                document.getElementById('setup-screen').style.display = 'flex';
+            }
+        }
+
+        function completeSetup() {
+            const input = document.getElementById('username-input').value;
+            if (input.trim() !== "") {
+                currentUser = input;
+                localStorage.setItem('omegaOS_user', currentUser);
+                document.getElementById('setup-screen').style.display = 'none';
+                startDesktop();
+            } else {
+                alert("Please enter a name.");
+            }
+        }
+
+        function startDesktop() {
+            document.getElementById('desktop').style.display = 'block';
+            document.getElementById('taskbar').style.display = 'flex';
+            document.getElementById('start-user').innerText = "👤 " + currentUser;
+        }
+
+        /* --- WINDOW MANAGEMENT --- */
+        function openApp(type) {
+            toggleStartMenu(false);
+            zIndexCounter++;
+            
+            const id = 'win-' + Date.now();
+            let title = "Application";
+            let content = "";
+            let width = "400px";
+            let height = "300px";
+
+            if (type === 'notepad') {
+                title = "Notepad";
+                const savedNote = localStorage.getItem('omegaOS_note') || "";
+                content = `<textarea class="notepad-area" id="note-${id}" oninput="saveNote(this.value)">${savedNote}</textarea>`;
+            } 
+            else if (type === 'browser') {
+                title = "Web Browser";
+                width = "800px";
+                height = "500px";
+                content = `
+                    <div class="browser-bar">
+                        <input type="text" id="url-${id}" value="https://www.wikipedia.org" placeholder="https://...">
+                        <button onclick="navigateBrowser('${id}')">Go</button>
+                    </div>
+                    <iframe class="browser-frame" id="frame-${id}" src="https://www.wikipedia.org"></iframe>
+                `;
+            } 
+            else if (type === 'explorer') {
+                title = "File Explorer";
+                content = `
+                    <div class="file-grid">
+                        <div class="file-item"><span class="file-icon">📁</span>Documents</div>
+                        <div class="file-item"><span class="file-icon">📁</span>Downloads</div>
+                        <div class="file-item"><span class="file-icon">📁</span>Pictures</div>
+                        <div class="file-item"><span class="file-icon">🎵</span>Music</div>
+                        <div class="file-item"><span class="file-icon">⚙️</span>System</div>
+                    </div>`;
+            } 
+            else if (type === 'calculator') {
+                title = "Calculator";
+                width = "260px";
+                height = "380px";
+                content = buildCalculator(id);
+            }
+
+            const win = document.createElement('div');
+            win.className = 'window';
+            win.id = id;
+            win.style.width = width;
+            win.style.height = height;
+            win.style.top = (50 + (zIndexCounter % 10) * 20) + 'px';
+            win.style.left = (50 + (zIndexCounter % 10) * 20) + 'px';
+            win.style.zIndex = zIndexCounter;
+            win.onmousedown = function() { bringToFront(id); };
+
+            win.innerHTML = `
+                <div class="title-bar" id="head-${id}">
+                    <div class="title-drag-area">${title}</div>
+                    <div class="title-bar-controls">
+                        <button class="min-btn" onclick="minimizeWindow('${id}')">_</button>
+                        <button class="close-btn" onclick="closeWindow('${id}')">✕</button>
+                    </div>
+                </div>
+                <div class="window-content">${content}</div>
+            `;
+
+            document.getElementById('desktop').appendChild(win);
+            addToTaskbar(id, title);
+            
+            // Initialize Draggable logic with the header
+            dragElement(win, document.getElementById('head-' + id));
+            
+            // If browser, add enter key listener
+            if(type === 'browser') {
+                document.getElementById(`url-${id}`).addEventListener("keypress", function(event) {
+                    if (event.key === "Enter") {
+                        navigateBrowser(id);
+                    }
+                });
+            }
+        }
+
+        /* --- APP LOGIC: CALCULATOR --- */
+        function buildCalculator(id) {
+            return `
+            <div class="calc-grid">
+                <input type="text" class="calc-display" id="calc-disp-${id}" readonly value="">
+                <button class="calc-btn" onclick="calcInput('${id}', 'C')">C</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '/')">/</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '*')">*</button>
+                <button class="calc-btn" onclick="calcInput('${id}', 'DEL')">←</button>
+                
+                <button class="calc-btn" onclick="calcInput('${id}', '7')">7</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '8')">8</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '9')">9</button>
+                <button class="calc-btn operator" onclick="calcInput('${id}', '-')">-</button>
+                
+                <button class="calc-btn" onclick="calcInput('${id}', '4')">4</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '5')">5</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '6')">6</button>
+                <button class="calc-btn operator" onclick="calcInput('${id}', '+')">+</button>
+                
+                <button class="calc-btn" onclick="calcInput('${id}', '1')">1</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '2')">2</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '3')">3</button>
+                <button class="calc-btn equals" style="grid-row: span 2" onclick="calcInput('${id}', '=')">=</button>
+                
+                <button class="calc-btn" onclick="calcInput('${id}', '0')" style="grid-column: span 2">0</button>
+                <button class="calc-btn" onclick="calcInput('${id}', '.')">.</button>
+            </div>`;
+        }
+
+        function calcInput(id, val) {
+            const disp = document.getElementById(`calc-disp-${id}`);
+            if (val === 'C') {
+                disp.value = '';
+            } else if (val === 'DEL') {
+                disp.value = disp.value.slice(0, -1);
+            } else if (val === '=') {
+                try {
+                    disp.value = eval(disp.value);
+                } catch {
+                    disp.value = 'Error';
+                }
+            } else {
+                disp.value += val;
+            }
+        }
+
+        /* --- APP LOGIC: BROWSER --- */
+        function navigateBrowser(id) {
+            let url = document.getElementById(`url-${id}`).value;
+            if (!url.startsWith('http')) {
+                url = 'https://' + url;
+            }
+            document.getElementById(`frame-${id}`).src = url;
+        }
+
+        /* --- APP LOGIC: NOTEPAD --- */
+        function saveNote(text) {
+            localStorage.setItem('omegaOS_note', text);
+        }
+
+        /* --- WINDOW HELPERS --- */
+        function closeWindow(id) {
+            document.getElementById(id).remove();
+            document.getElementById('task-' + id).remove();
+        }
+
+        function minimizeWindow(id) {
+            document.getElementById(id).style.display = 'none';
+            document.getElementById('task-' + id).classList.remove('active');
+        }
+
+        function bringToFront(id) {
+            zIndexCounter++;
+            document.getElementById(id).style.zIndex = zIndexCounter;
+            // Update active state in taskbar
+            document.querySelectorAll('.task-item').forEach(t => t.classList.remove('active'));
+            const task = document.getElementById('task-' + id);
+            if(task) task.classList.add('active');
+        }
+
+        function addToTaskbar(id, title) {
+            const task = document.createElement('div');
+            task.className = 'task-item active';
+            task.id = 'task-' + id;
+            task.innerText = title;
+            task.onclick = function() { 
+                const win = document.getElementById(id);
+                if(win.style.display === 'none') {
+                    win.style.display = 'flex';
+                    bringToFront(id);
+                } else {
+                    // Toggle minimize if it's already top
+                    if(win.style.zIndex == zIndexCounter) {
+                        minimizeWindow(id);
+                    } else {
+                        bringToFront(id);
+                    }
+                }
+            };
+            document.getElementById('task-list').appendChild(task);
+        }
+
+        function toggleStartMenu(forceState) {
+            const menu = document.getElementById('start-menu');
+            if (typeof forceState !== 'undefined') {
+                menu.style.display = forceState ? 'block' : 'none';
+            } else {
+                menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; 
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('clock').innerText = `${hours}:${minutes} ${ampm}`;
+        }
+
+        /* --- IMPROVED DRAG LOGIC --- */
+        function dragElement(elmnt, header) {
+            var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            
+            header.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                e.preventDefault();
+                // get the mouse cursor position at startup:
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                // Add class to body to disable iframe events during drag
+                document.body.classList.add('dragging-mode');
+                
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+                bringToFront(elmnt.id);
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                // calculate the new cursor position:
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                // set the element's new position:
+                elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+                elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                // stop moving when mouse button is released:
+                document.onmouseup = null;
+                document.onmousemove = null;
+                // Remove class to re-enable iframe interaction
+                document.body.classList.remove('dragging-mode');
+            }
+        }
+    </script>
+</body>
+</html>
