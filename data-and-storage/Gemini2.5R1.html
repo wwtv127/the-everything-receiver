@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gemini 2.5 R1</title>
+    <style>
+        /* R1 Design Constraints: 240x282px */
+        :root {
+            --r1-orange: #ff4f00;
+            --bg: #000000;
+            --text: #ffffff;
+            --ai-bubble: #1e1e1e;
+            --user-bubble: #ff4f00;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none; /* Prevent text selection on device */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 240px;
+            height: 282px;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Courier New', monospace; /* Retro-tech feel usually fits R1 */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        #status-bar {
+            height: 24px;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            font-size: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .indicator {
+            width: 8px;
+            height: 8px;
+            background: #555;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .indicator.active { background: #0f0; box-shadow: 0 0 5px #0f0; }
+        .indicator.listening { background: #f00; animation: blink 0.5s infinite; }
+        .indicator.thinking { background: #00f; animation: bounce 1s infinite; }
+
+        /* Chat Area */
+        #chat-viewport {
+            flex: 1;
+            overflow-y: hidden; /* We handle scroll manually via hardware wheel */
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+
+        .msg {
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            line-height: 1.3;
+            max-width: 90%;
+            word-wrap: break-word;
+        }
+
+        .ai {
+            background: var(--ai-bubble);
+            align-self: flex-start;
+            border-left: 2px solid #555;
+        }
+
+        .user {
+            background: var(--user-bubble);
+            color: #000;
+            align-self: flex-end;
+            font-weight: bold;
+        }
+
+        /* Input Area (Hidden mostly, visual cues for PTT) */
+        #input-zone {
+            height: 30px;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            border-top: 1px solid #333;
+        }
+
+        #ptt-hint {
+            color: #888;
+        }
+
+        /* Visual Feedback for PTT */
+        body.is-listening #input-zone {
+            background: var(--r1-orange);
+        }
+        body.is-listening #ptt-hint {
+            color: #000;
+            font-weight: bold;
+            content: "LISTENING...";
+        }
+
+        @keyframes blink { 50% { opacity: 0.4; } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+    </style>
+</head>
+<body>
+
+    <div id="status-bar">
+        <span>GEMINI 2.5</span>
+        <div id="status-dot" class="indicator"></div>
+    </div>
+
+    <div id="chat-viewport">
+        <div class="msg ai">Hold Side Button (PTT) to speak. Scroll to read.</div>
+    </div>
+
+    <div id="input-zone">
+        <span id="ptt-hint">HOLD SIDE BTN TO SPEAK</span>
+    </div>
+
+    <!-- Hidden Input for Fallback/Debugging -->
+    <input type="text" id="hidden-input" style="opacity:0; position:absolute; pointer-events:none;">
+
+    <script>
+        // --- CONFIGURATION ---
+        const API_KEY = "AIzaSyAyu53MaE3q8Uqee5CzmI0PiNtKUwQV8zc";
+        const MODEL_ID = "gemini-2.5-flash";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${API_KEY}`;
+
+        // --- ELEMENTS ---
+        const chatViewport = document.getElementById('chat-viewport');
+        const statusDot = document.getElementById('status-dot');
+        const pttHint = document.getElementById('ptt-hint');
+
+        // --- STATE ---
+        let isListening = false;
+        let recognition;
+        
+        // --- SCROLL WHEEL SUPPORT (R1 Hardware) ---
+        // The SDK documentation specifies scrollUp and scrollDown events
+        window.addEventListener("scrollUp", () => {
+            chatViewport.scrollTop -= 40; // Scroll up by 40px
+        });
+
+        window.addEventListener("scrollDown", () => {
+            chatViewport.scrollTop += 40; // Scroll down by 40px
+        });
+
+        // --- SIDE BUTTON / PTT SUPPORT (R1 Hardware) ---
+        // We use Long Press Start to Begin Listening, Long Press End to Stop & Send
+        
+        window.addEventListener("longPressStart", () => {
+            startListening();
+        });
+
+        window.addEventListener("longPressEnd", () => {
+            stopListeningAndSend();
+        });
+
+        // Fallback: Allow Spacebar on PC for testing PTT
+        document.addEventListener('keydown', (e) => {
+            if(e.code === 'Space' && !isListening) startListening();
+        });
+        document.addEventListener('keyup', (e) => {
+            if(e.code === 'Space' && isListening) stopListeningAndSend();
+        });
+
+        // --- SPEECH RECOGNITION SETUP ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true; // Keep listening while button is held
+            recognition.interimResults = true; // Show results as we speak (optional)
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                isListening = true;
+                document.body.classList.add('is-listening');
+                statusDot.className = 'indicator listening';
+                pttHint.innerText = "LISTENING...";
+            };
+
+            recognition.onend = () => {
+                // Handled by stop logic, but safety reset
+                if(isListening) stopListeningAndSend(); 
+            };
+
+            recognition.onresult = (event) => {
+                // Just storing the transcript, will send on release
+                let transcript = "";
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    transcript += event.results[i][0].transcript;
+                }
+                document.getElementById('hidden-input').value = transcript;
+            };
+        } else {
+            addMessage("Error: No Speech API found.", "ai");
+        }
+
+        // --- LOGIC ---
+
+        function startListening() {
+            if(!recognition) return;
+            try {
+                document.getElementById('hidden-input').value = ""; // Clear previous
+                recognition.start();
+            } catch(e) {
+                console.log("Mic already active");
+            }
+        }
+
+        function stopListeningAndSend() {
+            if(!recognition || !isListening) return;
+            
+            recognition.stop();
+            isListening = false;
+            document.body.classList.remove('is-listening');
+            statusDot.className = 'indicator';
+            pttHint.innerText = "PROCESSING...";
+
+            // Give a small delay for the final result to populate
+            setTimeout(() => {
+                const text = document.getElementById('hidden-input').value.trim();
+                if (text) {
+                    handleUserMessage(text);
+                } else {
+                    pttHint.innerText = "HOLD SIDE BTN TO SPEAK";
+                }
+            }, 200);
+        }
+
+        async function handleUserMessage(text) {
+            addMessage(text, 'user');
+            pttHint.innerText = "GEMINI THINKING...";
+            statusDot.className = 'indicator thinking';
+
+            try {
+                const responseText = await callGemini(text);
+                addMessage(responseText, 'ai');
+                speakText(responseText);
+            } catch (error) {
+                addMessage("Error: " + error.message, 'ai');
+            }
+
+            statusDot.className = 'indicator active';
+            pttHint.innerText = "HOLD SIDE BTN TO SPEAK";
+        }
+
+        // --- GEMINI API ---
+        async function callGemini(prompt) {
+            const requestBody = {
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            };
+
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Error ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        // --- UI HELPERS ---
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            // Clean markdown bolding
+            div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            chatViewport.appendChild(div);
+            
+            // Auto-scroll to bottom logic
+            chatViewport.scrollTop = chatViewport.scrollHeight;
+        }
+
+        // --- TTS ---
+        function speakText(text) {
+            window.speechSynthesis.cancel();
+            const clean = text.replace(/[*#]/g, '');
+            const utterance = new SpeechSynthesisUtterance(clean);
+            utterance.rate = 1.2; // Slightly faster for rapid interaction
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Initial Ready State
+        statusDot.className = 'indicator active';
+    </script>
+</body>
+</html>
