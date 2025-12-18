@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Price Is Right: Interactive Episode</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Open+Sans:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: #1a1a1a;
+            color: white;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .show-font {
+            font-family: 'Luckiest Guy', cursive;
+        }
+
+        .stage-gradient {
+            background: radial-gradient(circle at center, #ffcc00 0%, #ff6600 70%, #990000 100%);
+        }
+
+        .bounce {
+            animation: bounce 0.5s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            border-radius: 50%;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- Overlay for Initial Start (Required for iOS Audio/Speech Unlock) -->
+    <div id="overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
+        <div class="text-center p-8 bg-orange-600 rounded-3xl border-4 border-yellow-400 shadow-2xl mx-4">
+            <h1 class="text-5xl show-font mb-6 text-yellow-300 tracking-wider text-shadow-lg">THE PRICE IS RIGHT</h1>
+            <p id="loading-msg" class="text-xl mb-8 font-bold text-white">INITIALIZING VOICES...</p>
+            <button id="start-btn" disabled class="bg-gray-400 text-gray-700 cursor-not-allowed font-bold py-4 px-12 rounded-full text-2xl shadow-lg transition-all">
+                PLEASE WAIT
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Stage -->
+    <div id="game-container" class="hidden w-full max-w-4xl bg-orange-800 rounded-3xl overflow-hidden shadow-2xl border-8 border-yellow-500 relative">
+        <div class="bg-yellow-500 text-red-700 p-4 text-center">
+            <h2 id="status-text" class="text-2xl show-font uppercase tracking-widest">Awaiting the announcer...</h2>
+        </div>
+
+        <div class="stage-gradient h-80 flex items-center justify-center relative overflow-hidden">
+            <div id="crowd" class="absolute bottom-0 w-full flex justify-around px-4"></div>
+
+            <div id="prize-display" class="hidden text-center z-10 p-6 bg-white/20 backdrop-blur-md rounded-2xl border-4 border-yellow-400 mx-4">
+                <div id="prize-icon" class="text-7xl md:text-8xl mb-4">🚗</div>
+                <h3 id="prize-name" class="text-2xl md:text-3xl font-bold mb-2">A BRAND NEW CAR!</h3>
+                <p id="prize-desc" class="text-base md:text-lg italic">It's got leather seats and a cup holder!</p>
+            </div>
+
+            <div id="announcer-bubble" class="absolute top-6 left-6 hidden bg-white text-black p-4 rounded-2xl shadow-lg border-2 border-orange-500 z-30 max-w-[80%] after:content-[''] after:absolute after:top-full after:left-5 after:border-8 after:border-transparent after:border-t-white">
+                <p id="announcer-text" class="font-bold text-sm md:text-base"></p>
+            </div>
+        </div>
+
+        <div class="p-8 bg-red-700">
+            <div id="bidding-controls" class="hidden flex flex-col items-center gap-6">
+                <p class="text-xl font-bold uppercase text-center">What is your bid for this item?</p>
+                <div class="flex items-center gap-4">
+                    <span class="text-3xl show-font">$</span>
+                    <input type="number" id="bid-input" pattern="\d*" inputmode="numeric" class="text-4xl p-2 rounded-lg text-black w-48 text-center font-bold" placeholder="0000">
+                </div>
+                <button id="submit-bid" class="bg-green-500 hover:bg-green-400 text-white font-bold py-3 px-10 rounded-full text-xl shadow-md transform transition active:scale-95">
+                    LOCK IN BID
+                </button>
+            </div>
+
+            <div id="result-screen" class="hidden text-center">
+                <h2 id="result-title" class="text-5xl show-font mb-4">WINNER!</h2>
+                <p id="result-detail" class="text-2xl mb-6"></p>
+                <button id="play-again-btn" class="bg-yellow-400 text-red-700 font-bold py-2 px-6 rounded-full transform transition active:scale-95">PLAY AGAIN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tts = window.speechSynthesis;
+        let voices = [];
+        let announcerVoice = null;
+        let selectedPrize = null;
+
+        // --- ENHANCED LAYERED MUSIC ---
+        const bassSynth = new Tone.MonoSynth({
+            oscillator: { type: "square" },
+            envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 0.1 }
+        }).toDestination();
+        bassSynth.volume.value = -10;
+
+        const chordSynth = new Tone.PolySynth(Tone.AMSynth).toDestination();
+        chordSynth.volume.value = -15;
+
+        const leadSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+        leadSynth.volume.value = -12;
+
+        const mainTheme = new Tone.Part((time, value) => {
+            // Layer 1: Walking Bass
+            if (value.bass) bassSynth.triggerAttackRelease(value.bass, "8n", time);
+            // Layer 2: Rhythmic Chords
+            if (value.chords) chordSynth.triggerAttackRelease(value.chords, "4n", time);
+            // Layer 3: Main Melody
+            if (value.lead) leadSynth.triggerAttackRelease(value.lead, "8n", time);
+        }, [
+            { time: 0, bass: "G2", chords: ["G3", "B3", "D4"], lead: "G4" },
+            { time: "0:0:2", bass: "B2", lead: "B4" },
+            { time: "0:1:0", bass: "D3", chords: ["G3", "B3", "D4"], lead: "D5" },
+            { time: "0:1:2", bass: "B2", lead: "B4" },
+            { time: "0:2:0", bass: "C3", chords: ["C4", "E4", "G4"], lead: "E5" },
+            { time: "0:2:2", bass: "E3", lead: "G5" },
+            { time: "0:3:0", bass: "D3", chords: ["D4", "F#4", "A4"], lead: "F#5" },
+            { time: "0:3:2", bass: "C3", lead: "D5" }
+        ]);
+        mainTheme.loop = true;
+        mainTheme.loopEnd = "1m";
+
+        const people = [
+            { name: "John", emoji: "🧔", color: "bg-blue-500" },
+            { name: "Sarah", emoji: "👩‍🦰", color: "bg-pink-500" },
+            { name: "Deon", emoji: "👨🏾", color: "bg-green-600" },
+            { name: "Wei", emoji: "👨🏻", color: "bg-purple-500" },
+            { name: "Maria", emoji: "👩🏽", color: "bg-yellow-500" },
+            { name: "You", emoji: "🤩", color: "bg-orange-500" }
+        ];
+
+        const prizes = [
+            { name: "A 2024 ELECTRIC SEDAN", price: 34500, icon: "🚗", desc: "Eco-friendly and very shiny!" },
+            { name: "A LUXURY SWISS WATCH", price: 1200, icon: "⌚", desc: "Tells time and looks fancy!" },
+            { name: "A DESIGNER ESPRESSO MACHINE", price: 850, icon: "☕", desc: "For the perfect morning buzz." },
+            { name: "A TROPICAL VACATION", price: 5400, icon: "🏖️", desc: "Seven nights in paradise!" },
+            { name: "A SMART REFRIGERATOR", price: 2800, icon: "🧊", desc: "It tells you when you're out of milk!" },
+            { name: "A HIGH-END GAMING PC", price: 2500, icon: "🖥️", desc: "Over 200 frames per second!" },
+            { name: "A RIDE-ON LAWN MOWER", price: 1900, icon: "🚜", desc: "Cut your grass in half the time!" },
+            { name: "A PROFESSIONAL CAMERA", price: 3200, icon: "📷", desc: "Capture memories in 8K resolution!" },
+            { name: "A HOME THEATER SYSTEM", price: 1500, icon: "🔊", desc: "Experience movies like never before!" },
+            { name: "A PAIR OF DESIGNER BOOTS", price: 650, icon: "🥾", desc: "Walk in style and comfort!" },
+            { name: "A SET OF TITANIUM GOLF CLUBS", price: 1100, icon: "🏌️", desc: "Improve your swing today!" },
+            { name: "A PELOTON EXERCISE BIKE", price: 1450, icon: "🚲", desc: "Stay fit without leaving home!" },
+            { name: "A WOOD-FIRED PIZZA OVEN", price: 800, icon: "🍕", desc: "Perfect crust every single time!" },
+            { name: "A DESIGNER HANDBAG", price: 2200, icon: "👜", desc: "The ultimate fashion statement!" },
+            { name: "A PAIR OF NOISE-CANCELING HEADPHONES", price: 350, icon: "🎧", desc: "Pure silence at your fingertips!" },
+            { name: "A STAINLESS STEEL GAS RANGE", price: 1700, icon: "🔥", desc: "Cook like a professional chef!" },
+            { name: "A VINTAGE ARCADE MACHINE", price: 2100, icon: "🕹️", desc: "Classic games in your living room!" },
+            { name: "A PORTABLE GENERATOR", price: 950, icon: "⚡", desc: "Power whenever you need it most!" },
+            { name: "A DELUXE CAMPING TENT", price: 450, icon: "⛺", desc: "Fits the whole family comfortably!" },
+            { name: "A 4K OLED 75-INCH TELEVISION", price: 2300, icon: "📺", desc: "The clearest picture you've ever seen!" },
+            { name: "A PADDLEBOARD SET", price: 550, icon: "🏄", desc: "Explore the water this summer!" },
+            { name: "A LUXURY FOUNTAIN PEN", price: 400, icon: "✒️", desc: "For those important signatures!" },
+            { name: "A MODERN VELVET SOFA", price: 1600, icon: "🛋️", desc: "Soft, stylish, and super comfy!" },
+            { name: "A MOUNTAIN BIKE", price: 1250, icon: "🚵", desc: "Tackle the toughest trails!" },
+            { name: "A SMART HOME SECURITY KIT", price: 600, icon: "🛡️", desc: "Keep your home safe and sound!" },
+            { name: "A PROFESSIONAL DRONE", price: 1100, icon: "🚁", desc: "Stunning aerial photography!" },
+            { name: "A RECHARGEABLE ELECTRIC SCOOTER", price: 750, icon: "🛴", desc: "The coolest way to commute!" },
+            { name: "A SET OF CAST IRON COOKWARE", price: 300, icon: "🍳", desc: "Lasts a lifetime in the kitchen!" },
+            { name: "A HIGH-SPEED BLENDER", price: 450, icon: "🥤", desc: "Smoothies in seconds!" },
+            { name: "A CASHMERE SWEATER", price: 250, icon: "🧶", desc: "Warmth and luxury combined!" },
+            { name: "A ROBOT VACUUM CLEANER", price: 500, icon: "🧹", desc: "Clean floors without lifting a finger!" },
+            { name: "A PAIR OF DIAMOND EARRINGS", price: 3800, icon: "💎", desc: "Sparkle like a star!" },
+            { name: "A WINE CELLAR COOLER", price: 900, icon: "🍷", desc: "Keep your vintage bottles perfect!" },
+            { name: "A TELESCOPE SET", price: 700, icon: "🔭", desc: "Discover the wonders of the stars!" },
+            { name: "A PORTABLE PROJECTOR", price: 400, icon: "📽️", desc: "Movie night anywhere you go!" },
+            { name: "A STAND-UP ELECTRIC DESK", price: 650, icon: "🗄️", desc: "Work healthy and stay active!" },
+            { name: "AN ACOUSTIC GUITAR", price: 850, icon: "🎸", desc: "Hand-crafted for beautiful sound!" },
+            { name: "A KAYAK FOR TWO", price: 1100, icon: "🛶", desc: "Double the fun on the river!" },
+            { name: "A SMART WATCH SE", price: 300, icon: "⌚", desc: "Your health and apps on your wrist!" },
+            { name: "A SET OF LUGGAGE", price: 550, icon: "🧳", desc: "Travel across the world in style!" },
+            { name: "A GARDEN GREENHOUSE", price: 1300, icon: "🌿", desc: "Grow plants all year long!" },
+            { name: "A DIGITAL PIANO", price: 1800, icon: "🎹", desc: "Beautiful keys and realistic feel!" },
+            { name: "A HOT TUB SPA", price: 6500, icon: "🛁", desc: "Relaxation at the end of every day!" },
+            { name: "A TABLE TENNIS SET", price: 450, icon: "🏓", desc: "Family tournaments in the basement!" },
+            { name: "A LEATHER RECLINER", price: 950, icon: "💺", desc: "The best seat in the house!" },
+            { name: "A POWER DRILL COMBO KIT", price: 350, icon: "🛠️", desc: "For all your DIY projects!" },
+            { name: "A BABY STROLLER SYSTEM", price: 900, icon: "👶", desc: "Smooth rides for your little one!" },
+            { name: "A CONVECTION TOASTER OVEN", price: 250, icon: "🍞", desc: "Bake, toast, and air fry!" },
+            { name: "A LUXURY BEDDING SET", price: 400, icon: "🛏️", desc: "Sleep on a cloud every night!" },
+            { name: "A PAIR OF BINOCULARS", price: 300, icon: "👓", desc: "See the world up close!" },
+            { name: "A COMPACT DISHWASHER", price: 600, icon: "🍽️", desc: "Great for small apartments!" },
+            { name: "A WEIGHT BENCH SET", price: 550, icon: "🏋️", desc: "Build your dream home gym!" },
+            { name: "A DESIGNER SUNGLASSES PAIR", price: 350, icon: "🕶️", desc: "Protect your eyes with style!" },
+            { name: "A BACKYARD FIRE PIT", price: 250, icon: "🔥", desc: "Perfect for roasting marshmallows!" }
+        ];
+
+        function loadVoices() {
+            voices = tts.getVoices();
+            if (voices.length > 0) {
+                announcerVoice = voices.find(v => v.name.includes('Daniel') || v.name.includes('Samantha') || v.lang.includes('en-US'));
+                const startBtn = document.getElementById('start-btn');
+                const loadingMsg = document.getElementById('loading-msg');
+                startBtn.disabled = false;
+                startBtn.classList.remove('bg-gray-400', 'text-gray-700', 'cursor-not-allowed');
+                startBtn.classList.add('bg-yellow-400', 'hover:bg-yellow-300', 'text-red-700');
+                startBtn.innerText = "START SHOW";
+                loadingMsg.innerText = "VOICES READY!";
+            }
+        }
+
+        if (tts.onvoiceschanged !== undefined) {
+            tts.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+        const voiceInterval = setInterval(() => {
+            if (voices.length === 0) loadVoices(); else clearInterval(voiceInterval);
+        }, 500);
+
+        function speak(text, pitch = 1.0, rate = 0.9) {
+            return new Promise((resolve) => {
+                tts.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                if (announcerVoice) utterance.voice = announcerVoice;
+                utterance.pitch = pitch;
+                utterance.rate = rate;
+                utterance.volume = 1.0;
+                utterance.onend = () => resolve();
+                utterance.onerror = () => resolve();
+                setTimeout(() => resolve(), 8000);
+                tts.speak(utterance);
+            });
+        }
+
+        function playWinSound() {
+            const now = Tone.now();
+            leadSynth.triggerAttackRelease("C5", "8n", now);
+            leadSynth.triggerAttackRelease("E5", "8n", now + 0.1);
+            leadSynth.triggerAttackRelease("G5", "8n", now + 0.2);
+            leadSynth.triggerAttackRelease("C6", "4n", now + 0.3);
+        }
+
+        function playLoseSound() {
+            const now = Tone.now();
+            bassSynth.triggerAttackRelease("G2", "4n", now);
+            bassSynth.triggerAttackRelease("Gb2", "4n", now + 0.3);
+            bassSynth.triggerAttackRelease("F2", "2n", now + 0.6);
+        }
+
+        async function runEpisode() {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('prize-display').classList.add('hidden');
+            document.getElementById('bidding-controls').classList.add('hidden');
+            document.getElementById('bid-input').value = "";
+            
+            selectedPrize = prizes[Math.floor(Math.random() * prizes.length)];
+            
+            const crowdDiv = document.getElementById('crowd');
+            crowdDiv.innerHTML = "";
+            people.forEach((p, i) => {
+                const el = document.createElement('div');
+                el.className = `flex flex-col items-center transition-all duration-700 ${p.name === 'You' ? 'scale-125' : ''}`;
+                el.id = `person-${i}`;
+                el.innerHTML = `
+                    <div class="text-4xl bounce" style="animation-delay: ${Math.random()}s">${p.emoji}</div>
+                    <div class="text-[10px] font-bold px-1 rounded ${p.color}">${p.name}</div>
+                `;
+                crowdDiv.appendChild(el);
+            });
+
+            document.getElementById('status-text').innerText = "The Show Begins!";
+            Tone.Transport.start();
+            mainTheme.start(0);
+            
+            document.getElementById('announcer-bubble').classList.remove('hidden');
+            document.getElementById('announcer-text').innerText = "Welcome to The Price Is Right!";
+            await speak("Welcome to The Price is Right! I am your announcer!");
+            
+            document.getElementById('announcer-text').innerText = "Let's find our first contestant...";
+            await speak("And now, it is time to meet our first contestant. Who will it be?");
+
+            const winnerIdx = 5; 
+            const winner = people[winnerIdx];
+            document.getElementById('announcer-text').innerText = `${winner.name.toUpperCase()}, COME ON DOWN!`;
+            await speak(`${winner.name}, COME ON DOWN! You are the next contestant on The Price is Right!`);
+
+            const winnerEl = document.getElementById(`person-${winnerIdx}`);
+            winnerEl.classList.add('scale-150', '-translate-y-20', 'z-20');
+            document.getElementById('status-text').innerText = "YOU ARE ON STAGE!";
+            
+            await new Promise(r => setTimeout(r, 1000));
+            document.getElementById('announcer-bubble').classList.add('hidden');
+            document.getElementById('prize-display').classList.remove('hidden');
+            document.getElementById('prize-icon').innerText = selectedPrize.icon;
+            document.getElementById('prize-name').innerText = selectedPrize.name;
+            document.getElementById('prize-desc').innerText = selectedPrize.desc;
+
+            await speak(`Look at this! It is ${selectedPrize.name}! ${selectedPrize.desc}. Tell me, what is your bid?`);
+            document.getElementById('bidding-controls').classList.remove('hidden');
+        }
+
+        document.getElementById('submit-bid').addEventListener('click', async () => {
+            const userBid = parseInt(document.getElementById('bid-input').value);
+            if (!userBid || userBid <= 0) return;
+
+            document.getElementById('bidding-controls').classList.add('hidden');
+            document.getElementById('status-text').innerText = "Checking the price...";
+
+            const actualPrice = selectedPrize.price;
+            await speak(`Your bid is ${userBid} dollars. And the actual retail price is...`);
+            
+            await new Promise(r => setTimeout(r, 800));
+            
+            const win = userBid <= actualPrice && Math.abs(actualPrice - userBid) < (actualPrice * 0.25);
+            document.getElementById('status-text').innerText = `Actual Retail Price: $${actualPrice}`;
+            document.getElementById('result-screen').classList.remove('hidden');
+
+            mainTheme.stop();
+
+            if (userBid > actualPrice) {
+                playLoseSound();
+                document.getElementById('result-title').innerText = "OVERBID!";
+                document.getElementById('result-detail').innerText = `The price was $${actualPrice}. You went over!`;
+                await speak("Ooh, I'm sorry, you went over the actual retail price!");
+            } else if (win) {
+                playWinSound();
+                createConfetti();
+                document.getElementById('result-title').innerText = "YOU WIN!!";
+                document.getElementById('result-detail').innerText = `The price was $${actualPrice}. You've won the prize!`;
+                await speak("You win! You've got the price right! Congratulations!");
+            } else {
+                playLoseSound();
+                document.getElementById('result-title').innerText = "NOT QUITE!";
+                document.getElementById('result-detail').innerText = `The price was $${actualPrice}. Your bid was too low.`;
+                await speak("Not quite enough to win today, but thanks for playing!");
+            }
+        });
+
+        function createConfetti() {
+            for (let i = 0; i < 40; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                document.body.appendChild(c);
+                c.animate([{ top: '-10px' }, { top: '100vh' }], { duration: 2000 + Math.random() * 3000 });
+                setTimeout(() => c.remove(), 5000);
+            }
+        }
+
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            tts.cancel();
+            const unlock = new SpeechSynthesisUtterance(" ");
+            unlock.volume = 0;
+            tts.speak(unlock);
+            await Tone.start();
+            document.getElementById('overlay').classList.add('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            setTimeout(runEpisode, 200);
+        });
+
+        document.getElementById('play-again-btn').addEventListener('click', () => {
+            runEpisode();
+        });
+    </script>
+</body>
+</html>
