@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Celestial Odyssey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050505;
+            color: #e0e0e0;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* Reduced board size to ensure footer visibility */
+        .board-container {
+            position: relative;
+            width: 100%;
+            max-width: 340px;
+            aspect-ratio: 1 / 1;
+            margin-bottom: 10px;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 2px;
+            width: 100%;
+            height: 100%;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .cell {
+            position: relative;
+            background: #0a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.5rem;
+            color: #444;
+        }
+
+        .cell-index {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+        }
+
+        #player-token {
+            position: absolute;
+            width: 8%;
+            height: 8%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #4facfe 0%, #00f2fe 100%);
+            box-shadow: 0 0 15px #4facfe;
+            z-index: 50;
+            transition: 
+                left 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+                top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+                transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .warp-out {
+            transform: translate(-50%, -50%) scale(0) !important;
+            transition: transform 0.5s cubic-bezier(0.6, -0.28, 0.735, 0.045) !important;
+        }
+
+        .white-hole {
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, #fff 0%, #00f2fe 50%, transparent 100%);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        .black-hole {
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, #000 30%, #7f00ff 70%, transparent 100%);
+            border-radius: 50%;
+            opacity: 0.8;
+            animation: spin 4s infinite linear;
+        }
+
+        .evil-space {
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, #ff0000 10%, transparent 70%);
+            border-radius: 20%;
+            opacity: 0.5;
+            animation: flicker 0.5s infinite alternate;
+        }
+
+        .super-evil-space {
+            width: 65%;
+            height: 65%;
+            background: radial-gradient(circle, #9333ea 10%, transparent 70%);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: flicker-purple 0.4s infinite alternate;
+        }
+
+        @keyframes flicker {
+            from { opacity: 0.3; transform: scale(0.9); }
+            to { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        @keyframes flicker-purple {
+            from { opacity: 0.4; transform: scale(0.85); box-shadow: 0 0 5px #9333ea; }
+            to { opacity: 0.8; transform: scale(1.15); box-shadow: 0 0 15px #9333ea; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(0.8); opacity: 0.4; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .dice-btn {
+            background: linear-gradient(135deg, #1e1e1e 0%, #111 100%);
+            border: 1px solid #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+
+        .dice-btn:active {
+            transform: scale(0.95);
+        }
+
+        .status-msg {
+            min-height: 1.5rem;
+            transition: all 0.3s;
+        }
+        
+        #winModal, #startOverlay, #evilModal {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #startOverlay { background: rgba(0,0,0,0.95); }
+        
+        #winModal { 
+            background: rgba(0,0,0,0.95); 
+            display: none; /* Fixed bug: hide on load */
+        }
+        
+        #evilModal { 
+            background: radial-gradient(circle, rgba(15, 5, 25, 0.95) 0%, rgba(0,0,0,1) 100%);
+            display: none;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .evil-card {
+            background: #111;
+            border: 1px solid #333;
+            padding: 1.5rem;
+            border-radius: 12px;
+            transition: all 0.1s;
+            opacity: 0.6;
+        }
+
+        .evil-card.highlight {
+            border-color: #ff0000;
+            box-shadow: 0 0 20px rgba(255,0,0,0.6);
+            opacity: 1;
+            transform: scale(1.05);
+            background: #200;
+        }
+
+        .evil-card.highlight-purple {
+            border-color: #a855f7;
+            box-shadow: 0 0 20px rgba(168,85,247,0.6);
+            opacity: 1;
+            transform: scale(1.05);
+            background: #203;
+        }
+
+        .cloud-fade {
+            animation: cloudDisperse 0.8s forwards;
+        }
+
+        @keyframes cloudDisperse {
+            to { opacity: 0; filter: blur(20px); transform: scale(1.5); }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between h-screen p-4 max-w-md mx-auto">
+
+    <div id="startOverlay">
+        <div class="text-center">
+            <h2 class="text-3xl font-light text-white mb-8 tracking-widest uppercase">Celestial Odyssey</h2>
+            <p class="text-gray-500 mb-6 text-sm">Caution: Anomaly Zones Detected.</p>
+            <button id="startBtn" class="bg-cyan-600 text-white px-10 py-4 rounded-full font-bold animate-pulse shadow-lg shadow-cyan-500/20">INITIATE ENGINES</button>
+        </div>
+    </div>
+
+    <header class="w-full text-center py-2">
+        <h1 class="text-xl font-light tracking-widest text-white uppercase">Celestial Odyssey</h1>
+        <div id="status" class="status-msg text-cyan-400 text-xs mt-1">Engines Ready</div>
+    </header>
+
+    <div class="board-container">
+        <main id="gameBoard" class="board-grid">
+            <!-- Cells generated by JS -->
+        </main>
+        <div id="player-token"></div>
+    </div>
+
+    <footer class="w-full flex flex-col items-center gap-4 py-2">
+        <div class="flex items-center gap-8">
+            <div class="text-center">
+                <div class="text-[10px] uppercase text-gray-500 mb-1">Position</div>
+                <div id="posDisplay" class="text-2xl font-bold">1</div>
+            </div>
+            <div id="diceRoll" class="text-4xl font-light text-white w-10 text-center">?</div>
+            <div class="text-center">
+                <div class="text-[10px] uppercase text-gray-500 mb-1">Rolls</div>
+                <div id="rollCount" class="text-2xl font-bold text-gray-400">0</div>
+            </div>
+        </div>
+
+        <button id="rollBtn" class="dice-btn w-16 h-16 rounded-full flex items-center justify-center text-white text-lg font-bold">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="15.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="8.5" cy="15.5" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle></svg>
+        </button>
+    </footer>
+
+    <!-- Evil Anomaly Interaction -->
+    <div id="evilModal">
+        <div id="evilContainer" class="text-center w-full max-w-xs">
+            <h2 id="evilTitle" class="text-2xl font-bold text-red-500 mb-8 uppercase tracking-widest">Anomaly Destabilization</h2>
+            <div id="evilCards" class="flex flex-col gap-4 mb-8">
+                <div id="opt-0" class="evil-card">
+                    <div id="label-0" class="text-xs text-red-800 uppercase mb-1">Penalty Alpha</div>
+                    <div id="text-0" class="text-xl font-bold text-white">-5 SPACES</div>
+                </div>
+                <div id="opt-1" class="evil-card">
+                    <div id="label-1" class="text-xs text-red-800 uppercase mb-1">Penalty Beta</div>
+                    <div id="text-1" class="text-xl font-bold text-white">-10 SPACES</div>
+                </div>
+                <div id="opt-2" class="evil-card">
+                    <div id="label-2" class="text-xs text-red-800 uppercase mb-1">Penalty Gamma</div>
+                    <div id="text-2" class="text-xl font-bold text-white">BLACK HOLE PULL</div>
+                </div>
+            </div>
+            <div id="evilMessage" class="text-red-600 font-mono text-xs animate-pulse">CALCULATING FATE...</div>
+        </div>
+    </div>
+
+    <div id="winModal">
+        <div class="bg-zinc-900 p-8 rounded-2xl border border-cyan-500/50 text-center max-w-xs">
+            <h2 class="text-3xl font-bold text-white mb-2">Goal Reached!</h2>
+            <p id="finalStats" class="text-gray-400 mb-6">You navigated the galaxy in 24 rolls.</p>
+            <button onclick="resetGame()" class="bg-cyan-600 text-white px-8 py-3 rounded-full font-bold w-full">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const boardSize = 100;
+        const boardElement = document.getElementById('gameBoard');
+        const posDisplay = document.getElementById('posDisplay');
+        const rollDisplay = document.getElementById('diceRoll');
+        const countDisplay = document.getElementById('rollCount');
+        const statusDisplay = document.getElementById('status');
+        const rollBtn = document.getElementById('rollBtn');
+        const playerToken = document.getElementById('player-token');
+        const winModal = document.getElementById('winModal');
+        const evilModal = document.getElementById('evilModal');
+        const evilContainer = document.getElementById('evilContainer');
+        const startOverlay = document.getElementById('startOverlay');
+        const startBtn = document.getElementById('startBtn');
+
+        let playerPos = 1;
+        let rollCount = 0;
+        let isMoving = false;
+
+        let synth, transportSynth, anomalySynth;
+
+        function initAudio() {
+            Tone.Destination.volume.value = 0; 
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
+            }).toDestination();
+
+            transportSynth = new Tone.MonoSynth({
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.05, decay: 0.5, sustain: 0.4, release: 0.8 }
+            }).toDestination();
+
+            // Softer chime for anomalies
+            anomalySynth = new Tone.PolySynth(Tone.AMSynth, {
+                harmonicity: 2,
+                envelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.8 }
+            }).toDestination();
+        }
+
+        async function playDiceClick() { if (synth) synth.triggerAttackRelease("C2", "32n", Tone.now(), 0.3); }
+        function playStep() { if (synth) synth.triggerAttackRelease("E4", "32n", Tone.now(), 0.3); }
+        
+        function playWhiteHole() {
+            const now = Tone.now();
+            if (transportSynth) {
+                transportSynth.triggerAttackRelease("C3", "0.8s", now);
+                transportSynth.frequency.exponentialRampToValueAtTime("C6", now + 0.6);
+            }
+        }
+        function playBlackHole() {
+            const now = Tone.now();
+            if (transportSynth) {
+                transportSynth.triggerAttackRelease("C5", "0.8s", now);
+                transportSynth.frequency.exponentialRampToValueAtTime("C2", now + 0.6);
+            }
+        }
+        
+        function playAnomalyChime() {
+            const now = Tone.now();
+            if (anomalySynth) {
+                const notes = ["G5", "A5", "C6", "E6"];
+                const note = notes[Math.floor(Math.random() * notes.length)];
+                anomalySynth.triggerAttackRelease(note, "16n", now, 0.4);
+            }
+        }
+
+        function playWinSound() {
+            const now = Tone.now();
+            if (synth) {
+                synth.triggerAttackRelease("C4", "8n", now);
+                synth.triggerAttackRelease("E4", "8n", now + 0.1);
+                synth.triggerAttackRelease("G4", "8n", now + 0.2);
+                synth.triggerAttackRelease("C5", "2n", now + 0.3);
+            }
+        }
+
+        const whiteHoles = [4, 13, 22, 33, 42, 50, 62, 74, 85];
+        const blackHoles = [99, 89, 76, 66, 54, 43, 27, 15];
+        const evilSpaces = [19, 37, 58, 82, 95];
+        const superEvilSpaces = [45, 68, 87];
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            for (let r = 9; r >= 0; r--) {
+                const isEvenRow = r % 2 === 0;
+                if (isEvenRow) {
+                    for (let c = 0; c <= 9; c++) addCell(r * 10 + c + 1);
+                } else {
+                    for (let c = 9; c >= 0; c--) addCell(r * 10 + c + 1);
+                }
+            }
+            setTimeout(() => updatePlayerUI(false), 50);
+        }
+
+        function addCell(index) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `cell-${index}`;
+            const idxSpan = document.createElement('span');
+            idxSpan.className = 'cell-index';
+            idxSpan.innerText = index;
+            cell.appendChild(idxSpan);
+            if (whiteHoles.includes(index)) {
+                const hole = document.createElement('div');
+                hole.className = 'white-hole';
+                cell.appendChild(hole);
+            } else if (blackHoles.includes(index)) {
+                const hole = document.createElement('div');
+                hole.className = 'black-hole';
+                cell.appendChild(hole);
+            } else if (evilSpaces.includes(index)) {
+                const hole = document.createElement('div');
+                hole.className = 'evil-space';
+                cell.appendChild(hole);
+            } else if (superEvilSpaces.includes(index)) {
+                const hole = document.createElement('div');
+                hole.className = 'super-evil-space';
+                cell.appendChild(hole);
+            }
+            boardElement.appendChild(cell);
+        }
+
+        function updatePlayerUI(smooth = true) {
+            const currentCell = document.getElementById(`cell-${playerPos}`);
+            if (currentCell) {
+                const cellRect = currentCell.getBoundingClientRect();
+                const containerRect = document.querySelector('.board-container').getBoundingClientRect();
+                
+                const centerX = (cellRect.left + cellRect.width / 2) - containerRect.left;
+                const centerY = (cellRect.top + cellRect.height / 2) - containerRect.top;
+
+                if (!smooth) {
+                    playerToken.style.transition = 'none';
+                } else {
+                    playerToken.style.transition = 'left 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                }
+
+                playerToken.style.left = `${centerX}px`;
+                playerToken.style.top = `${centerY}px`;
+            }
+            posDisplay.innerText = playerPos;
+        }
+
+        async function warpPlayer(targetPos) {
+            playerToken.classList.add('warp-out');
+            await new Promise(r => setTimeout(r, 500));
+            playerToken.style.transition = 'none';
+            playerPos = targetPos;
+            updatePlayerUI(false);
+            playerToken.offsetHeight;
+            playerToken.classList.remove('warp-out');
+            playerToken.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            await new Promise(r => setTimeout(r, 500));
+            updatePlayerUI(true);
+        }
+
+        async function triggerEvilSpinner(isSuper = false) {
+            evilModal.style.display = 'flex';
+            evilContainer.classList.remove('cloud-fade');
+            
+            const title = document.getElementById('evilTitle');
+            const msg = document.getElementById('evilMessage');
+            const highlightClass = isSuper ? 'highlight-purple' : 'highlight';
+            
+            if (isSuper) {
+                title.innerText = "CRITICAL DESTABILIZATION";
+                title.classList.add('text-purple-500');
+                title.classList.remove('text-red-500');
+                msg.classList.add('text-purple-600');
+                msg.classList.remove('text-red-600');
+                document.getElementById('text-0').innerText = "-10 SPACES";
+                document.getElementById('text-1').innerText = "-20 SPACES";
+                document.getElementById('text-2').innerText = "SYSTEM RESET";
+            } else {
+                title.innerText = "ANOMALY DESTABILIZATION";
+                title.classList.add('text-red-500');
+                title.classList.remove('text-purple-500');
+                msg.classList.add('text-red-600');
+                msg.classList.remove('text-purple-600');
+                document.getElementById('text-0').innerText = "-5 SPACES";
+                document.getElementById('text-1').innerText = "-10 SPACES";
+                document.getElementById('text-2').innerText = "BLACK HOLE PULL";
+            }
+
+            const cards = [document.getElementById('opt-0'), document.getElementById('opt-1'), document.getElementById('opt-2')];
+            cards.forEach(c => c.classList.remove('highlight', 'highlight-purple'));
+            msg.innerText = "CALCULATING FATE...";
+
+            let currentIndex = 0;
+            let spins = 0;
+            const maxSpins = 20 + Math.floor(Math.random() * 10);
+            
+            const spinInterval = setInterval(() => {
+                cards.forEach(c => c.classList.remove('highlight', 'highlight-purple'));
+                currentIndex = (currentIndex + 1) % cards.length;
+                cards[currentIndex].classList.add(highlightClass);
+                playAnomalyChime();
+                
+                spins++;
+                if (spins >= maxSpins) {
+                    clearInterval(spinInterval);
+                    const finalChoice = currentIndex;
+                    msg.innerText = "DESTINY LOCKED";
+                    
+                    setTimeout(() => {
+                        evilContainer.classList.add('cloud-fade');
+                        setTimeout(() => {
+                            evilModal.style.display = 'none';
+                            let outcome;
+                            if (isSuper) {
+                                outcome = finalChoice === 0 ? -10 : (finalChoice === 1 ? -20 : "START");
+                            } else {
+                                outcome = finalChoice === 0 ? -5 : (finalChoice === 1 ? -10 : "BH");
+                            }
+                            applyEvilMove(outcome);
+                        }, 800);
+                    }, 1200);
+                }
+            }, 100);
+        }
+
+        async function applyEvilMove(offset) {
+            let target;
+            if (offset === "BH") {
+                target = blackHoles.find(h => h < playerPos) || 1;
+                playBlackHole();
+                await warpPlayer(target);
+            } else if (offset === "START") {
+                target = 1;
+                playBlackHole();
+                await warpPlayer(target);
+            } else {
+                target = Math.max(1, playerPos + offset);
+                playBlackHole();
+                playerPos = target;
+                updatePlayerUI();
+            }
+            statusDisplay.innerText = "Anomaly applied.";
+            rollBtn.disabled = false;
+            isMoving = false;
+        }
+
+        async function movePlayer(steps) {
+            isMoving = true;
+            rollBtn.disabled = true;
+            statusDisplay.innerText = "Cruising...";
+
+            for (let i = 0; i < steps; i++) {
+                if (playerPos >= boardSize) break;
+                playerPos++;
+                playStep();
+                updatePlayerUI();
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            if (superEvilSpaces.includes(playerPos)) {
+                statusDisplay.innerText = "Entering Super Anomaly...";
+                await new Promise(r => setTimeout(r, 600));
+                triggerEvilSpinner(true);
+                return;
+            }
+
+            if (evilSpaces.includes(playerPos)) {
+                statusDisplay.innerText = "Entering Anomaly...";
+                await new Promise(r => setTimeout(r, 600));
+                triggerEvilSpinner(false);
+                return;
+            }
+
+            if (whiteHoles.includes(playerPos)) {
+                const nextHole = whiteHoles.find(h => h > playerPos);
+                if (nextHole) {
+                    statusDisplay.innerText = "White Hole Jump!";
+                    playWhiteHole();
+                    await new Promise(r => setTimeout(r, 200));
+                    await warpPlayer(nextHole);
+                }
+            } else if (blackHoles.includes(playerPos)) {
+                const nextHole = blackHoles.find(h => h < playerPos);
+                if (nextHole) {
+                    statusDisplay.innerText = "Black Hole Pull!";
+                    playBlackHole();
+                    await new Promise(r => setTimeout(r, 200));
+                    await warpPlayer(nextHole);
+                }
+            }
+
+            updatePlayerUI();
+            if (playerPos >= boardSize) {
+                playerPos = boardSize;
+                updatePlayerUI();
+                playWinSound();
+                showWin();
+            } else {
+                statusDisplay.innerText = "Awaiting command";
+                rollBtn.disabled = false;
+                isMoving = false;
+            }
+        }
+
+        function rollDice() {
+            if (isMoving) return;
+            const roll = Math.floor(Math.random() * 6) + 1;
+            rollCount++;
+            countDisplay.innerText = rollCount;
+            
+            let counter = 0;
+            const anim = setInterval(() => {
+                rollDisplay.innerText = Math.floor(Math.random() * 6) + 1;
+                playDiceClick();
+                counter++;
+                if (counter > 10) {
+                    clearInterval(anim);
+                    rollDisplay.innerText = roll;
+                    movePlayer(roll);
+                }
+            }, 70);
+        }
+
+        function showWin() {
+            document.getElementById('finalStats').innerText = `You crossed the galaxy in ${rollCount} jumps.`;
+            winModal.style.display = 'flex';
+        }
+
+        function resetGame() {
+            playerPos = 1;
+            rollCount = 0;
+            isMoving = false;
+            countDisplay.innerText = '0';
+            rollDisplay.innerText = '?';
+            statusDisplay.innerText = 'Engines ready';
+            winModal.style.display = 'none';
+            evilModal.style.display = 'none';
+            rollBtn.disabled = false;
+            updatePlayerUI(false);
+        }
+
+        startBtn.addEventListener('click', async () => {
+            await Tone.start();
+            initAudio();
+            startOverlay.style.display = 'none';
+        });
+
+        rollBtn.addEventListener('click', rollDice);
+        window.onload = createBoard;
+        window.onresize = () => updatePlayerUI(false);
+    </script>
+</body>
+</html>
+
