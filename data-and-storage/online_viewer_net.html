@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Night</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: black;
+            color: #d4d4d8;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        .cinematic-bg {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.2;
+            overflow: hidden;
+            z-index: 0;
+        }
+        .card {
+            background-color: #121214;
+            border-top: 4px solid #dc2626;
+            border-radius: 0.75rem;
+            box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.7);
+            padding: 2.5rem;
+            max-width: 44rem;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .step-hidden { display: none; }
+        .btn-primary {
+            background-color: #dc2626;
+            color: white;
+            font-weight: 700;
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-primary:hover { 
+            background-color: #ef4444; 
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(220, 38, 38, 0.4);
+        }
+        .btn-primary:active { transform: translateY(0) scale(0.98); }
+        
+        .btn-secondary {
+            background-color: #fafafa;
+            color: #09090b;
+            font-weight: 700;
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-secondary:hover { 
+            background-color: white; 
+            box-shadow: 0 0 25px rgba(255,255,255,0.15);
+            transform: translateY(-1px);
+        }
+        .btn-secondary:active { transform: translateY(0) scale(0.98); }
+        
+        input {
+            background-color: #1c1c21;
+            border: 1px solid #2d2d33;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: white;
+            width: 100%;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+        input:focus {
+            outline: none;
+            border-color: #dc2626;
+            background-color: #242429;
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15);
+        }
+
+        .voting-btn {
+            background-color: #1c1c21;
+            border: 1px solid #2d2d33;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .voting-btn:not(:disabled):hover {
+            border-color: #dc2626;
+            background-color: #242429;
+            transform: translateX(4px);
+        }
+        .voting-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background-color: #0f0f11;
+        }
+
+        .share-banner {
+            background: linear-gradient(90deg, #18181b, #121214);
+            border: 1px solid #27272a;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-12">
+    <div class="cinematic-bg">
+        <div class="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-red-900/30 to-transparent"></div>
+        <div class="absolute -left-32 top-1/2 w-64 h-screen bg-red-900/10 blur-[150px] rounded-full"></div>
+        <div class="absolute -right-32 top-1/2 w-64 h-screen bg-red-900/10 blur-[150px] rounded-full"></div>
+    </div>
+
+    <div class="relative z-10 max-w-6xl mx-auto">
+        <header class="text-center mb-16">
+            <h1 class="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-red-400 to-red-600 italic tracking-tighter uppercase select-none">
+                Movie Night
+            </h1>
+            <div class="flex justify-center items-center gap-4 mt-4 text-zinc-500 uppercase tracking-[0.4em] text-xs font-bold">
+                <div class="h-[1px] w-12 bg-zinc-800"></div>
+                <span>Curated Cinema</span>
+                <div class="h-[1px] w-12 bg-zinc-800"></div>
+            </div>
+        </header>
+
+        <!-- STEP 1: SETUP -->
+        <div id="step-setup" class="step">
+            <div class="card">
+                <div class="flex items-center gap-4 mb-8 border-b border-zinc-800/50 pb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <h2 class="text-3xl font-bold tracking-tight uppercase text-zinc-100">Admissions</h2>
+                </div>
+                <div class="space-y-8">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-widest mb-3 text-zinc-500">Number of Critics</label>
+                        <input type="number" id="numPeople" min="2" max="10" value="2" class="text-lg font-bold">
+                    </div>
+                    <div id="guest-inputs" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+                    <button onclick="startNominations()" class="btn-primary flex items-center justify-center gap-3">
+                        Start Nominations
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: NOMINATIONS -->
+        <div id="step-nominations" class="step step-hidden">
+            <div class="card">
+                <div class="flex items-center gap-4 mb-8 border-b border-zinc-800/50 pb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M17 3v18"/><path d="M3 7h4"/><path d="M3 11h4"/><path d="M3 15h4"/><path d="M17 7h4"/><path d="M17 11h4"/><path d="M17 15h4"/></svg>
+                    <h2 class="text-3xl font-bold tracking-tight uppercase text-zinc-100">Nominations</h2>
+                </div>
+                <div id="nomination-status" class="text-center mb-10">
+                    <p class="text-red-500 uppercase text-xs font-black tracking-[0.3em] mb-2">Now Pitching</p>
+                    <h3 id="current-nominator" class="text-4xl font-black text-white tracking-tight"></h3>
+                </div>
+                <div id="nomination-form" class="space-y-5">
+                    <input type="text" id="movieInput" placeholder="Enter movie title..." class="text-xl p-5 border-2">
+                    <button onclick="submitNomination()" class="btn-secondary flex items-center justify-center gap-3">
+                        Submit Entry
+                    </button>
+                </div>
+                <div class="share-banner">
+                    <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Share Session Link</p>
+                    <div class="flex gap-2">
+                        <input type="text" readonly id="share-url-nom" class="text-xs py-2 bg-black/50 border-zinc-800">
+                        <button onclick="copyShareUrl(this)" class="px-4 bg-zinc-800 rounded text-xs font-bold hover:bg-zinc-700 whitespace-nowrap">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3: VOTING -->
+        <div id="step-voting" class="step step-hidden">
+            <div class="card">
+                <div class="flex items-center gap-4 mb-8 border-b border-zinc-800/50 pb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+                    <h2 class="text-3xl font-bold tracking-tight uppercase text-zinc-100">The Ballot Box</h2>
+                </div>
+                <div id="voting-status" class="text-center mb-10">
+                    <p class="text-red-500 uppercase text-xs font-black tracking-[0.3em] mb-2">Casting Vote</p>
+                    <h3 id="current-voter" class="text-4xl font-black text-white"></h3>
+                </div>
+                <div id="voting-list" class="grid gap-4"></div>
+                <div class="share-banner">
+                    <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Share Session Link</p>
+                    <div class="flex gap-2">
+                        <input type="text" readonly id="share-url-vote" class="text-xs py-2 bg-black/50 border-zinc-800">
+                        <button onclick="copyShareUrl(this)" class="px-4 bg-zinc-800 rounded text-xs font-bold hover:bg-zinc-700 whitespace-nowrap">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 4: RESULTS -->
+        <div id="step-results" class="step step-hidden">
+            <div class="card">
+                <div class="flex items-center gap-4 mb-8 border-b border-zinc-800/50 pb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                    <h2 class="text-3xl font-bold tracking-tight uppercase text-zinc-100">Final Credits</h2>
+                </div>
+                <div id="results-content" class="flex flex-col items-center py-8 min-h-[350px]"></div>
+            </div>
+        </div>
+
+        <div class="mt-16 max-w-4xl mx-auto">
+            <div class="h-2 w-full bg-zinc-900/50 rounded-full blur-sm shadow-[0_0_30px_rgba(0,0,0,1)]"></div>
+            <div class="w-full h-[1px] bg-gradient-to-r from-transparent via-red-900/40 to-transparent mt-6"></div>
+        </div>
+    </div>
+
+    <footer class="mt-16 text-center text-zinc-600 text-[10px] uppercase tracking-[0.5em] pb-16 opacity-50 font-bold">
+        Curated Cinema Experience &copy; <span id="year"></span>
+    </footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // --- PASTE YOUR CONFIG HERE ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyANzhTIQbJgfapnVwQsLnW278s5SOVRizY",
+  authDomain: "xstream-a29a5.firebaseapp.com",
+  projectId: "xstream-a29a5",
+  storageBucket: "xstream-a29a5.firebasestorage.app",
+  messagingSenderId: "1015069413945",
+  appId: "1:1015069413945:web:efe987c7530dfc688273e8",
+  measurementId: "G-LD32GG0E0H"
+};
+
+        let app, db, auth;
+        let sessionId = new URLSearchParams(window.location.search).get('session');
+
+        // Robust Initialization
+        const initFirebase = async () => {
+            if (!firebaseConfig.apiKey) {
+                console.warn("Firebase config missing. Running in local-only mode.");
+                return;
+            }
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await signInAnonymously(auth);
+                
+                if (sessionId) {
+                    setupSync();
+                }
+            } catch (e) {
+                console.error("Firebase init failed:", e);
+            }
+        };
+
+        // --- App State ---
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        let state = {
+            step: 'setup',
+            participants: [],
+            nominations: [],
+            votes: [],
+            winner: null,
+            currentUserIndex: 0,
+            numPeople: 2
+        };
+
+        const setupSync = () => {
+            onSnapshot(doc(db, "sessions", sessionId), (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    state = { ...state, ...data };
+                    updateView();
+                }
+            }, (err) => console.error("Sync error:", err));
+        };
+
+        const pushState = async (updates) => {
+            state = { ...state, ...updates };
+            if (db && sessionId) {
+                await setDoc(doc(db, "sessions", sessionId), state, { merge: true });
+            }
+            updateView();
+        };
+
+        window.copyShareUrl = (btn) => {
+            const url = window.location.origin + window.location.pathname + "?session=" + sessionId;
+            const input = btn.previousElementSibling;
+            input.value = url;
+            input.select();
+            document.execCommand('copy');
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        };
+
+        // Audio helper
+        let audioCtx = null;
+        window.playSound = (type) => {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            if(type === 'click') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                osc.start(); osc.stop(now + 0.15);
+            } else if(type === 'nominate') {
+                [440, 660, 880].forEach((freq, i) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.connect(g); g.connect(audioCtx.destination);
+                    o.frequency.setValueAtTime(freq, now + (i * 0.05));
+                    g.gain.setValueAtTime(0, now + (i * 0.05));
+                    g.gain.linearRampToValueAtTime(0.1, now + (i * 0.05) + 0.05);
+                    g.gain.exponentialRampToValueAtTime(0.01, now + (i * 0.05) + 0.4);
+                    o.start(now + (i * 0.05)); o.stop(now + (i * 0.05) + 0.4);
+                });
+            } else if(type === 'tick') {
+                const tosc = audioCtx.createOscillator();
+                const tgain = audioCtx.createGain();
+                tosc.connect(tgain); tgain.connect(audioCtx.destination);
+                tosc.type = 'triangle';
+                tosc.frequency.setValueAtTime(200, now);
+                tosc.frequency.exponentialRampToValueAtTime(50, now + 0.04);
+                tgain.gain.setValueAtTime(0.3, now);
+                tgain.gain.linearRampToValueAtTime(0, now + 0.04);
+                tosc.start(); tosc.stop(now + 0.04);
+            } else if(type === 'fanfare') {
+                [261.63, 329.63, 392.00, 523.25].forEach(freq => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = 'sawtooth';
+                    o.connect(g); g.connect(audioCtx.destination);
+                    o.frequency.setValueAtTime(freq, now);
+                    g.gain.setValueAtTime(0, now);
+                    g.gain.linearRampToValueAtTime(0.05, now + 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+                    o.start(); o.stop(now + 1.5);
+                });
+            }
+        };
+
+        const updateView = () => {
+            document.querySelectorAll('.step').forEach(el => el.classList.add('step-hidden'));
+            const currentStepEl = document.getElementById(`step-${state.step}`);
+            if (currentStepEl) currentStepEl.classList.remove('step-hidden');
+
+            const currentUrl = window.location.origin + window.location.pathname + "?session=" + sessionId;
+
+            if (state.step === 'nominations') {
+                document.getElementById('current-nominator').textContent = state.participants[state.currentUserIndex]?.name || '';
+                document.getElementById('share-url-nom').value = currentUrl;
+            } else if (state.step === 'voting') {
+                document.getElementById('current-voter').textContent = state.participants[state.currentUserIndex]?.name || '';
+                document.getElementById('share-url-vote').value = currentUrl;
+                renderVotingList();
+            } else if (state.step === 'results') {
+                if (state.winner) {
+                    renderWinner();
+                }
+            }
+        };
+
+        const renderGuestInputs = () => {
+            const container = document.getElementById('guest-inputs');
+            if(!container) return;
+            container.innerHTML = '';
+            const count = parseInt(document.getElementById('numPeople').value);
+            for (let i = 0; i < count; i++) {
+                container.innerHTML += `
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-zinc-600">Guest ${i + 1}</label>
+                        <input type="text" class="guest-name-input" data-index="${i}" placeholder="Enter name..." required>
+                    </div>
+                `;
+            }
+        };
+
+        document.getElementById('numPeople').addEventListener('change', renderGuestInputs);
+
+        window.startNominations = async () => {
+            window.playSound('click');
+            const inputs = document.querySelectorAll('.guest-name-input');
+            const participants = Array.from(inputs).map((input, i) => ({
+                id: i,
+                name: input.value || `Guest ${i + 1}`
+            }));
+            
+            if (!sessionId) {
+                sessionId = Math.random().toString(36).substring(7);
+                window.history.pushState({}, '', '?session=' + sessionId);
+                if (db) setupSync();
+            }
+
+            await pushState({
+                participants,
+                step: 'nominations',
+                currentUserIndex: 0
+            });
+        };
+
+        window.submitNomination = async () => {
+            const movie = document.getElementById('movieInput').value;
+            if (!movie) return;
+            window.playSound('nominate');
+            
+            const newNomination = {
+                participantId: state.participants[state.currentUserIndex].id,
+                participantName: state.participants[state.currentUserIndex].name,
+                movie: movie
+            };
+            
+            const nextIndex = state.currentUserIndex + 1;
+            const isDone = nextIndex >= state.participants.length;
+            
+            let nextStep = 'nominations';
+            let finalIndex = nextIndex;
+
+            if (isDone) {
+                finalIndex = 0;
+                nextStep = (state.participants.length === 2) ? 'results' : 'voting';
+            }
+
+            document.getElementById('movieInput').value = '';
+
+            await pushState({
+                nominations: [...state.nominations, newNomination],
+                currentUserIndex: finalIndex,
+                step: nextStep
+            });
+
+            if (isDone && state.participants.length === 2) {
+                triggerTieBreaker(state.nominations.map(n => n.movie));
+            }
+        };
+
+        const renderVotingList = () => {
+            const container = document.getElementById('voting-list');
+            if (!container) return;
+            container.innerHTML = '';
+            const currentVoterId = state.participants[state.currentUserIndex]?.id;
+
+            state.nominations.forEach((nom, i) => {
+                const isOwnMovie = nom.participantId === currentVoterId;
+                const btn = document.createElement('button');
+                btn.className = `voting-btn group`;
+                btn.disabled = isOwnMovie;
+                btn.onclick = () => window.castVote(nom.movie);
+                btn.innerHTML = `
+                    <div class="pr-4">
+                        <span class="block text-xl font-bold text-white group-hover:text-red-400 transition-colors leading-tight">${nom.movie}</span>
+                        <span class="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-1 block">Presented by ${nom.participantName}</span>
+                    </div>
+                    ${!isOwnMovie ? '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><rect width="18" height="18" x="3" y="3" rx="2"/></svg>' : ''}
+                `;
+                container.appendChild(btn);
+            });
+        };
+
+        window.castVote = async (movie) => {
+            window.playSound('click');
+            const newVote = { voterId: state.participants[state.currentUserIndex].id, movie };
+            const nextIndex = state.currentUserIndex + 1;
+            const isDone = nextIndex >= state.participants.length;
+
+            if (!isDone) {
+                await pushState({
+                    votes: [...state.votes, newVote],
+                    currentUserIndex: nextIndex
+                });
+            } else {
+                state.votes.push(newVote);
+                calculateResults();
+            }
+        };
+
+        const calculateResults = async () => {
+            const tally = {};
+            state.nominations.forEach(n => tally[n.movie] = 0);
+            state.votes.forEach(v => tally[v.movie]++);
+
+            const maxVotes = Math.max(...Object.values(tally));
+            const winners = Object.keys(tally).filter(m => tally[m] === maxVotes);
+
+            if (winners.length > 1) {
+                await pushState({ step: 'results' });
+                triggerTieBreaker(winners);
+            } else {
+                await pushState({ winner: winners[0], step: 'results' });
+                window.playSound('fanfare');
+            }
+        }
+
+        const triggerTieBreaker = (tiedMovies) => {
+            const container = document.getElementById('results-content');
+            if (!container) return;
+            container.innerHTML = `
+                <div class="w-full text-center" id="roulette-ui">
+                    <div class="inline-block mb-6 text-red-500 uppercase tracking-[0.4em] text-xs font-black opacity-80">
+                        Analyzing Critical Consensus
+                    </div>
+                    <div class="text-4xl md:text-6xl font-black text-white px-8 py-16 border-4 border-zinc-800/80 rounded-[2rem] bg-[#0c0c0e] shadow-[0_0_50px_rgba(0,0,0,0.5)] min-h-[220px] flex items-center justify-center">
+                        <span id="roulette-text" class="leading-tight"></span>
+                    </div>
+                </div>
+            `;
+
+            let iterations = 0;
+            const maxIterations = 30;
+            let speed = 80;
+            let lastSelection = null;
+
+            const runRoulette = () => {
+                let nextSelection;
+                if (tiedMovies.length > 1) {
+                    do { nextSelection = tiedMovies[Math.floor(Math.random() * tiedMovies.length)]; } while (nextSelection === lastSelection);
+                } else {
+                    nextSelection = tiedMovies[0];
+                }
+                
+                const txt = document.getElementById('roulette-text');
+                if (txt) txt.textContent = nextSelection;
+                lastSelection = nextSelection;
+                window.playSound('tick');
+                
+                iterations++;
+                if (iterations < maxIterations) {
+                    speed += 12;
+                    setTimeout(runRoulette, speed);
+                } else {
+                    setTimeout(async () => {
+                        await pushState({ winner: nextSelection });
+                        renderWinner();
+                        window.playSound('fanfare');
+                    }, 500);
+                }
+            };
+            runRoulette();
+        };
+
+        const renderWinner = () => {
+            const container = document.getElementById('results-content');
+            if (!container) return;
+            container.innerHTML = `
+                <div class="text-center">
+                    <div class="bg-yellow-500 text-black px-5 py-1.5 text-[10px] font-black uppercase rounded-sm mb-8 tracking-[0.4em] inline-block shadow-lg">
+                        Feature Presentation
+                    </div>
+                    <h3 class="text-5xl md:text-8xl font-black text-white mb-12 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)] leading-[1.1]">
+                        ${state.winner}
+                    </h3>
+                    <button onclick="window.resetApp()" class="flex items-center gap-3 bg-zinc-900 hover:bg-zinc-800 text-white px-10 py-4 rounded-full transition-all border border-zinc-700 uppercase text-xs font-black tracking-[0.2em] hover:scale-105 active:scale-95 mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        New Screening
+                    </button>
+                </div>
+            `;
+        };
+
+        window.resetApp = () => {
+            window.playSound('click');
+            state = {
+                step: 'setup',
+                participants: [],
+                nominations: [],
+                votes: [],
+                winner: null,
+                currentUserIndex: 0,
+                numPeople: 2
+            };
+            window.history.replaceState({}, document.title, window.location.pathname);
+            sessionId = null;
+            renderGuestInputs();
+            updateView();
+        };
+
+        // Initialize
+        initFirebase().then(() => {
+            if (!sessionId) {
+                renderGuestInputs();
+                updateView();
+            }
+        });
+    </script>
+</body>
+</html>
+
