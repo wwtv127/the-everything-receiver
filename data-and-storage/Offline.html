@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Video Catalog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #ef4444;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .dot-red { background-color: #ef4444; box-shadow: 0 0 8px #ef4444; }
+        .dot-green { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        
+        .video-player-overlay {
+            background: rgba(0, 0, 0, 0.95);
+        }
+        
+        video::-webkit-media-controls-panel {
+            background-image: linear-gradient(transparent, rgba(239, 68, 68, 0.2));
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-gray-900 flex items-center">
+                <span class="text-red-600 mr-2">●</span> Offline Library
+            </h1>
+            <button onclick="showScreen('addVideo')" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg transition-transform active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Screen: Library -->
+    <main id="libraryScreen" class="max-w-4xl mx-auto p-4 py-8">
+        <div id="videoGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <!-- Videos will appear here -->
+        </div>
+        
+        <div id="emptyState" class="hidden text-center py-20">
+            <div class="bg-white rounded-2xl p-8 shadow-sm inline-block max-w-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <h2 class="text-lg font-semibold text-gray-900">No videos saved</h2>
+                <p class="text-gray-500 mt-2 text-sm">Click the + button to add your favorite YouTube videos for offline viewing.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Screen: Add Video -->
+    <div id="addVideoScreen" class="hidden fixed inset-0 bg-gray-50 z-20 overflow-y-auto">
+        <div class="max-w-md mx-auto p-4 py-12">
+            <div class="flex items-center mb-8">
+                <button onclick="showScreen('library')" class="text-gray-600 mr-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </button>
+                <h2 class="text-2xl font-bold text-gray-900">Add Video</h2>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+                <div class="space-y-4">
+                    <div>
+                        <label for="videoUrl" class="block text-sm font-medium text-gray-700 mb-1">YouTube Link</label>
+                        <input type="text" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." 
+                            class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="setQuality('480')" id="btn480" class="quality-btn py-2 px-4 rounded-lg border-2 border-gray-200 text-gray-600 font-medium hover:border-red-500 transition-all">480p</button>
+                        <button onclick="setQuality('720')" id="btn720" class="quality-btn py-2 px-4 rounded-lg border-2 border-gray-200 text-gray-600 font-medium hover:border-red-500 transition-all">720p</button>
+                    </div>
+
+                    <button onclick="startConversion()" id="convertBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors shadow-lg active:transform active:scale-95 disabled:bg-gray-400">
+                        Convert & Save
+                    </button>
+                </div>
+
+                <div id="statusArea" class="hidden space-y-4 pt-4 border-t border-gray-100">
+                    <div id="loadingStatus" class="flex items-center justify-center space-x-3 text-gray-600">
+                        <div class="loader"></div>
+                        <span id="statusText">Processing...</span>
+                    </div>
+
+                    <div id="successArea" class="hidden text-center space-y-4">
+                        <div class="flex items-center justify-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                            <span class="text-sm font-medium text-gray-600 mr-2">Status:</span>
+                            <div id="statusDot" class="status-dot dot-red"></div>
+                            <span id="statusLabel" class="text-sm font-bold text-gray-700 uppercase tracking-tighter">Processing</span>
+                        </div>
+                        <div class="text-xs text-gray-500 italic">Please stay on this page. Video will be added to your library once it's ready.</div>
+                    </div>
+                </div>
+
+                <div id="errorMessage" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Player Overlay -->
+    <div id="playerOverlay" class="hidden fixed inset-0 video-player-overlay z-50 flex items-center justify-center p-4">
+        <button onclick="closePlayer()" class="absolute top-6 right-6 text-white hover:text-red-500 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <div class="w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden shadow-2xl ring-1 ring-red-600/30">
+            <video id="mainVideoPlayer" controls class="w-full h-full"></video>
+        </div>
+    </div>
+
+    <script>
+        let selectedQuality = '720'; 
+        let statusCheckInterval = null;
+        let db = null;
+
+        // UI Selectors
+        const libraryScreen = document.getElementById('libraryScreen');
+        const addVideoScreen = document.getElementById('addVideoScreen');
+        const videoGrid = document.getElementById('videoGrid');
+        const emptyState = document.getElementById('emptyState');
+        const statusArea = document.getElementById('statusArea');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const successArea = document.getElementById('successArea');
+        const statusText = document.getElementById('statusText');
+        const errorMessage = document.getElementById('errorMessage');
+        const statusDot = document.getElementById('statusDot');
+        const statusLabel = document.getElementById('statusLabel');
+
+        // IndexedDB Initialization for better performance with large files
+        const request = indexedDB.open("VideoLibraryDB", 1);
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            if (!db.objectStoreNames.contains("videos")) {
+                db.createObjectStore("videos", { keyPath: "id" });
+            }
+        };
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            renderLibrary();
+        };
+
+        setQuality('720');
+
+        function showScreen(screen) {
+            libraryScreen.classList.add('hidden');
+            addVideoScreen.classList.add('hidden');
+            if(screen === 'library') {
+                libraryScreen.classList.remove('hidden');
+                renderLibrary();
+            } else {
+                addVideoScreen.classList.remove('hidden');
+            }
+        }
+
+        function setQuality(q) {
+            selectedQuality = q;
+            document.querySelectorAll('.quality-btn').forEach(btn => {
+                btn.classList.remove('border-red-500', 'text-red-600', 'bg-red-50');
+                btn.classList.add('border-gray-200', 'text-gray-600');
+            });
+            const activeBtn = document.getElementById('btn' + q);
+            activeBtn.classList.remove('border-gray-200', 'text-gray-600');
+            activeBtn.classList.add('border-red-500', 'text-red-600', 'bg-red-50');
+        }
+
+        function extractVideoId(url) {
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        async function startConversion() {
+            const urlInput = document.getElementById('videoUrl').value.trim();
+            const videoId = extractVideoId(urlInput);
+
+            if (statusCheckInterval) clearInterval(statusCheckInterval);
+            
+            errorMessage.classList.add('hidden');
+            statusArea.classList.remove('hidden');
+            loadingStatus.classList.remove('hidden');
+            successArea.classList.add('hidden');
+            statusText.innerText = "Extracting video details...";
+            
+            statusDot.className = "status-dot dot-red";
+            statusLabel.innerText = "Processing";
+
+            if (!videoId) {
+                showError("Please enter a valid YouTube link.");
+                return;
+            }
+
+            try {
+                const apiUrl = `https://dubs.io/wp-json/tools/v1/download-video?id=${videoId}&format=${selectedQuality}`;
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error("Server error");
+                
+                const data = await response.json();
+
+                if (data.success && data.progressId) {
+                    loadingStatus.classList.add('hidden');
+                    successArea.classList.remove('hidden');
+                    startStatusPolling(data.progressId, data.title, videoId);
+                } else {
+                    showError("Could not convert video. The service might be busy.");
+                }
+            } catch (err) {
+                showError("Request failed. Please try again later.");
+            }
+        }
+
+        function startStatusPolling(progressId, title, videoId) {
+            const targetUrl = `https://penny83.savenow.to/pacific/?${progressId}`;
+            const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
+            
+            statusCheckInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) return;
+                    const pageContent = await response.text();
+
+                    if (pageContent && !pageContent.includes("File not found")) {
+                        statusDot.className = "status-dot dot-green";
+                        statusLabel.innerText = "Ready";
+                        clearInterval(statusCheckInterval);
+                        downloadAndSave(targetUrl, title, videoId);
+                    }
+                } catch (e) {
+                    console.log("Polling...");
+                }
+            }, 4000); 
+        }
+
+        async function downloadAndSave(url, title, videoId) {
+            try {
+                statusLabel.innerText = "Downloading...";
+                const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+                const response = await fetch(proxyUrl);
+                const blob = await response.blob();
+                
+                statusLabel.innerText = "Saving...";
+                
+                const videoObj = {
+                    id: Date.now().toString(),
+                    ytId: videoId,
+                    title: title || "Untitled Video",
+                    data: blob, // Store blob directly in IndexedDB for speed
+                    thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                    timestamp: Date.now()
+                };
+                
+                const tx = db.transaction("videos", "readwrite");
+                const store = tx.objectStore("videos");
+                store.add(videoObj);
+                
+                tx.oncomplete = () => {
+                    document.getElementById('videoUrl').value = '';
+                    showScreen('library');
+                };
+            } catch (e) {
+                showError("Conversion ready but failed to save. Try refreshing.");
+            }
+        }
+
+        function renderLibrary() {
+            if (!db) return;
+            const store = db.transaction("videos", "readonly").objectStore("videos");
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const videos = request.result.sort((a,b) => b.timestamp - a.timestamp);
+                videoGrid.innerHTML = '';
+                
+                if (videos.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+                emptyState.classList.add('hidden');
+
+                videos.forEach(video => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group";
+                    card.innerHTML = `
+                        <div class="relative aspect-video cursor-pointer" onclick="playVideo('${video.id}')">
+                            <img src="${video.thumbnail}" class="w-full h-full object-cover" alt="thumbnail">
+                            <div class="absolute inset-0 bg-black/20 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+                                <div class="bg-red-600 text-white p-3 rounded-full shadow-lg transform group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-4 flex items-start justify-between">
+                            <div class="flex-1 pr-2">
+                                <h3 class="font-bold text-gray-900 line-clamp-2 text-sm">${video.title}</h3>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="downloadDirect('${video.id}')" class="text-gray-400 hover:text-red-600 transition-colors p-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                </button>
+                                <button onclick="deleteVideo('${video.id}')" class="text-gray-300 hover:text-gray-600 transition-colors p-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    videoGrid.appendChild(card);
+                });
+            };
+        }
+
+        function playVideo(id) {
+            const store = db.transaction("videos", "readonly").objectStore("videos");
+            const request = store.get(id);
+            request.onsuccess = () => {
+                const video = request.result;
+                if (!video) return;
+                const player = document.getElementById('mainVideoPlayer');
+                const overlay = document.getElementById('playerOverlay');
+                const url = URL.createObjectURL(video.data);
+                player.src = url;
+                overlay.classList.remove('hidden');
+                player.play();
+            };
+        }
+
+        function closePlayer() {
+            const player = document.getElementById('mainVideoPlayer');
+            const overlay = document.getElementById('playerOverlay');
+            player.pause();
+            if (player.src) URL.revokeObjectURL(player.src);
+            player.src = "";
+            overlay.classList.add('hidden');
+        }
+
+        function downloadDirect(id) {
+            const store = db.transaction("videos", "readonly").objectStore("videos");
+            const request = store.get(id);
+            request.onsuccess = () => {
+                const video = request.result;
+                if (!video) return;
+                const url = URL.createObjectURL(video.data);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${video.title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            };
+        }
+
+        function deleteVideo(id) {
+            const tx = db.transaction("videos", "readwrite");
+            tx.objectStore("videos").delete(id);
+            tx.oncomplete = () => renderLibrary();
+        }
+
+        function showError(msg) {
+            statusArea.classList.add('hidden');
+            errorMessage.innerText = msg;
+            errorMessage.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
+
